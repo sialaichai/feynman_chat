@@ -66,7 +66,7 @@ if prompt := st.chat_input("Ask a physics question..."):
         # We use the generic 'gemini-1.5-flash' which works on the new library.
         # If this fails, the 'except' block below will diagnose why.
         model = genai.GenerativeModel(
-            model_name="gemini-1.5-flash", 
+            model_name="gemini-2.5-flash", 
             system_instruction=SEAB_H2_INSTRUCTIONS
         )
         
