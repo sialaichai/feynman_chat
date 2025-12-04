@@ -115,7 +115,7 @@ if prompt := st.chat_input("Type your question here..."):
         
         # Using Flash for speed, but instructions enforce slow pacing
         model = genai.GenerativeModel(
-            model_name="gemini-1.5-flash", 
+            model_name="gemini-2.5-flash", 
             system_instruction=SEAB_H2_SOCRATIC_INSTRUCTIONS
         )
         
