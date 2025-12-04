@@ -167,24 +167,5 @@ if prompt := st.chat_input("Ask a question..."):
                     
         st.session_state.messages.append({"role": "assistant", "content": response.text})
 
-except Exception as e:
-        # --- DIAGNOSTIC MODE ---
-        st.error(f"❌ Connection Error: {e}")
-        st.warning("🔍 Attempting to list available models for your API Key...")
-        
-        try:
-            st.markdown("### Available Models:")
-            found_flash = False
-            for m in genai.list_models():
-                if 'generateContent' in m.supported_generation_methods:
-                    st.code(m.name)
-                    if "flash" in m.name:
-                        found_flash = True
-            
-            if found_flash:
-                st.success("✅ 'Flash' is available! The server just needs the updated requirements.txt.")
-            else:
-                st.error("⚠️ No 'Flash' model found. Try using 'models/gemini-pro' instead.")
-                
-        except Exception as debug_err:
-            st.error(f"Could not list models. Check your API Key permissions. ({debug_err})")
+    except Exception as e:
+        st.error(f"Error: {e}")
