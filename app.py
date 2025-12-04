@@ -128,7 +128,7 @@ if prompt := st.chat_input("Ask about a concept (e.g., 'Why is the sky blue?' or
             # but we send the system instruction in the config.
             
             response = client.models.generate_content(
-                model="gemini-1.5-pro",
+                model="gemini-1.5-pro-latest",
                 contents=final_prompt,
                 config=genai.types.GenerateContentConfig(
                     system_instruction=SEAB_H2_INSTRUCTIONS,
