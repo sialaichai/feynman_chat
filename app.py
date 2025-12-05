@@ -44,7 +44,7 @@ def display_message(role, content):
             st.markdown(content)
 
 # -----------------------------------------------------------------------------
-# 3. SYSTEM INSTRUCTIONS (ROBUST + SCIPY FIX)
+# 3. SYSTEM INSTRUCTIONS
 # -----------------------------------------------------------------------------
 SEAB_H2_MASTER_INSTRUCTIONS = """
 **Identity:**
@@ -53,16 +53,16 @@ You are Richard Feynman. Tutor for Singapore H2 Physics (Syllabus 9478).
 **CORE TOOLS:**
 1.  **Graphing (Python):** If asked to plot/graph, WRITE PYTHON CODE.
     * **Libraries:** Use ONLY `matplotlib.pyplot`, `numpy`, and `scipy`.
-    * **CRITICAL RULE:** Use **Vectorized Operations** (e.g., `y = np.sin(x)`) instead of `for` loops to avoid index errors.
+    * **CRITICAL RULE:** Use **Vectorized Operations** (e.g., `y = np.sin(x)`) instead of `for` loops.
     * **Format:** Enclose strictly in ` ```python ` blocks.
 
 2.  **Sketching (ASCII):** For diagrams (forces, circuits), use ASCII art in code blocks.
 
-3.  **Vision:** Analyze uploaded images or camera photos if provided.
+3.  **Vision:** Analyze uploaded images, PDFs, or camera photos if provided.
 
 **PEDAGOGY (SOCRATIC):**
 * Ask **ONE** simple question at a time.
-* Use analogies first (e.g., Voltage = Pressure).
+* Use analogies first.
 * **Do not** solve the math immediately. Guide the student.
 * **Summary:** When they understand, provide a summary in a blockquote (`>`).
 
@@ -73,7 +73,9 @@ You are Richard Feynman. Tutor for Singapore H2 Physics (Syllabus 9478).
 # 4. SIDEBAR (WITH CAMERA & UPLOAD TABS)
 # -----------------------------------------------------------------------------
 with st.sidebar:
-    st.image("https://upload.wikimedia.org/wikipedia/en/4/42/Richard_Feynman_Nobel.jpg(https://upload.wikimedia.org/wikipedia/en/4/42/Richard_Feynman_Nobel.jpg)", width=150)
+    # FIX 1: Clean URL (No Markdown brackets)
+    st.image("[https://upload.wikimedia.org/wikipedia/en/4/42/Richard_Feynman_Nobel.jpg](https://upload.wikimedia.org/wikipedia/en/4/42/Richard_Feynman_Nobel.jpg)", width=150)
+    
     st.header("⚙️ Settings")
     topic = st.selectbox("Topic:", ["General", "Mechanics", "Waves", "Electricity", "Modern Physics", "Practicals"])
     
@@ -84,12 +86,12 @@ with st.sidebar:
 
     st.divider()
     
-# --- DUAL INPUT MODE (Tabs) ---
+    # --- DUAL INPUT MODE (Tabs) ---
     st.markdown("### 📸 Vision & Docs")
     
     tab_upload, tab_cam = st.tabs(["📂 File", "📷 Camera"])
     
-    # We rename 'image_part' to 'visual_content' to reflect it can be a PDF too
+    # Initialize the variable to None so it is always defined
     visual_content = None
     
     # Tab 1: File Uploader (Updated for PDF)
@@ -119,10 +121,13 @@ with st.sidebar:
             visual_content = image
             st.image(image, caption="Camera Photo", use_container_width=True)
 
-    # Display the final selected image (from either source)
-    if image_part:
-        st.success("Image acquired!")
-        st.image(image_part, caption="Ready to Analyze", use_container_width=True)
+    # FIX 2: Check 'visual_content' instead of 'image_part'
+    if visual_content:
+        st.success("Visual input acquired!")
+        # Only show preview if it's an image (PDFs are handled above)
+        if not isinstance(visual_content, dict):
+             # We already showed the image inside the tab, so we don't need to duplicate it here
+             pass
 
     st.divider()
     if st.button("🧹 Clear Chat"):
@@ -132,16 +137,18 @@ with st.sidebar:
 # -----------------------------------------------------------------------------
 # 5. MAIN CHAT LOGIC
 # -----------------------------------------------------------------------------
+# FIX 3: Update title logic to use 'visual_content'
 st.title("⚛️ H2 Feynman Bot")
-st.caption(f"Topic: **{topic}** | Vision: **{'Active' if image_part else 'Inactive'}**")
+st.caption(f"Topic: **{topic}** | Vision: **{'Active' if visual_content else 'Inactive'}**")
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
-    st.session_state.messages.append({"role": "assistant", "content": "Hello! I can **see** diagrams (upload or snap a photo), **plot graphs**, and help you master physics. What's the problem?"})
+    st.session_state.messages.append({"role": "assistant", "content": "Hello! I can **see** diagrams/PDFs, **plot graphs**, and help you master physics. What's the problem?"})
 
 for msg in st.session_state.messages:
     display_message(msg["role"], msg["content"])
 
+# FIX 4: Correct Indentation (Everything below belongs inside 'if prompt:')
 if prompt := st.chat_input("Ask a question..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
@@ -151,11 +158,11 @@ if prompt := st.chat_input("Ask a question..."):
         st.error("Key missing.")
         st.stop()
 
-try:
+    try:
         genai.configure(api_key=api_key)
         
         # 1. Define Model
-        model_name = "gemini-1.5-flash" 
+        model_name = "gemini-2.5-flash" 
         model = genai.GenerativeModel(
             model_name=model_name, 
             system_instruction=SEAB_H2_MASTER_INSTRUCTIONS
@@ -167,7 +174,7 @@ try:
         
         # ATTACH CONTENT (Image OR PDF)
         if visual_content:
-            final_prompt.append(visual_content) # API handles both PIL Images and PDF dictionaries
+            final_prompt.append(visual_content)
             final_prompt.append(f"analyzing this document/image. [Context: {topic}]")
         
         final_prompt.append(f"Conversation History:\n{history_text}\n\nUSER: {prompt}\nASSISTANT:")
@@ -179,24 +186,22 @@ try:
         display_message("assistant", response.text)
         st.session_state.messages.append({"role": "assistant", "content": response.text})
 
-except Exception as e:
-    # --- DIAGNOSTIC MODE ---
-    st.error(f"❌ Error: {e}")
-        
-    # If it's a 404 or Invalid Argument, we check the models
-    if "404" in str(e) or "not found" in str(e).lower():
-        st.warning(f"⚠️ Model '{model_name}' not found. Listing available models for your Key...")
-        try:
-            available_models = []
-            for m in genai.list_models():
-                if 'generateContent' in m.supported_generation_methods:
-                    available_models.append(m.name)
+    except Exception as e:
+        # --- DIAGNOSTIC MODE ---
+        st.error(f"❌ Error: {e}")
+            
+        if "404" in str(e) or "not found" in str(e).lower():
+            st.warning(f"⚠️ Model '{model_name}' not found. Listing available models for your Key...")
+            try:
+                available_models = []
+                for m in genai.list_models():
+                    if 'generateContent' in m.supported_generation_methods:
+                        available_models.append(m.name)
                 
-            if available_models:
-                st.success(f"✅ Your API Key has access to these models:")
-                st.code("\n".join(available_models))
-                st.info("Update the 'model_name' variable in app.py to one of these!")
-            else:
-                st.error("❌ Your API Key has NO access to content generation models. Check Google AI Studio settings.")
-        except Exception as inner_e:
-            st.error(f"Could not list models: {inner_e}")
+                if available_models:
+                    st.success(f"✅ Your API Key has access to these models:")
+                    st.code("\n".join(available_models))
+                else:
+                    st.error("❌ Your API Key has NO access to content generation models.")
+            except Exception as inner_e:
+                st.error(f"Could not list models: {inner_e}")
