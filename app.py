@@ -84,25 +84,40 @@ with st.sidebar:
 
     st.divider()
     
-    # --- DUAL INPUT MODE (Tabs) ---
-    st.markdown("### 📸 Vision Input")
+# --- DUAL INPUT MODE (Tabs) ---
+    st.markdown("### 📸 Vision & Docs")
     
-    # We create two tabs: one for Upload, one for Camera
-    tab_upload, tab_cam = st.tabs(["📂 Upload File", "📷 Use Camera"])
+    tab_upload, tab_cam = st.tabs(["📂 File", "📷 Camera"])
     
-    image_part = None
+    # We rename 'image_part' to 'visual_content' to reflect it can be a PDF too
+    visual_content = None
     
-    # Tab 1: File Uploader
+    # Tab 1: File Uploader (Updated for PDF)
     with tab_upload:
-        uploaded_file = st.file_uploader("Choose an image", type=["jpg", "png", "jpeg"])
+        uploaded_file = st.file_uploader("Upload Image or PDF", type=["jpg", "png", "jpeg", "pdf"])
+        
         if uploaded_file:
-            image_part = Image.open(uploaded_file)
-    
-    # Tab 2: Camera Input
+            # CHECK FILE TYPE
+            if uploaded_file.type == "application/pdf":
+                # PDF HANDLING: Read bytes and create a dictionary for Gemini
+                visual_content = {
+                    "mime_type": "application/pdf",
+                    "data": uploaded_file.getvalue()
+                }
+                st.success(f"📄 PDF Loaded: {uploaded_file.name}")
+            else:
+                # IMAGE HANDLING: Use PIL
+                image = Image.open(uploaded_file)
+                st.image(image, caption="Image Loaded", use_container_width=True)
+                visual_content = image
+
+    # Tab 2: Camera Input (Images only)
     with tab_cam:
         camera_photo = st.camera_input("Take a photo")
         if camera_photo:
-            image_part = Image.open(camera_photo)
+            image = Image.open(camera_photo)
+            visual_content = image
+            st.image(image, caption="Camera Photo", use_container_width=True)
 
     # Display the final selected image (from either source)
     if image_part:
@@ -136,11 +151,11 @@ if prompt := st.chat_input("Ask a question..."):
         st.error("Key missing.")
         st.stop()
 
-    try:
+try:
         genai.configure(api_key=api_key)
         
         # 1. Define Model
-        model_name = "gemini-2.5-flash" 
+        model_name = "gemini-1.5-flash" 
         model = genai.GenerativeModel(
             model_name=model_name, 
             system_instruction=SEAB_H2_MASTER_INSTRUCTIONS
@@ -150,10 +165,10 @@ if prompt := st.chat_input("Ask a question..."):
         history_text = "\n".join([f"{m['role'].upper()}: {m['content']}" for m in st.session_state.messages if m['role'] != 'system'])
         final_prompt = []
         
-        # If image exists, attach it to this turn
-        if image_part:
-            final_prompt.append(image_part)
-            final_prompt.append(f"analyzing this image. [Context: {topic}]")
+        # ATTACH CONTENT (Image OR PDF)
+        if visual_content:
+            final_prompt.append(visual_content) # API handles both PIL Images and PDF dictionaries
+            final_prompt.append(f"analyzing this document/image. [Context: {topic}]")
         
         final_prompt.append(f"Conversation History:\n{history_text}\n\nUSER: {prompt}\nASSISTANT:")
 
