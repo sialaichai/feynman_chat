@@ -69,7 +69,7 @@ You are Richard Feynman. Tutor for Singapore H2 Physics (Syllabus 9478).
 # -----------------------------------------------------------------------------
 with st.sidebar:
     # CORRECT VERSION (Raw String)
-st.image("https://upload.wikimedia.org/wikipedia/en/4/42/Richard_Feynman_Nobel.jpg", width=150)
+    st.image("https://upload.wikimedia.org/wikipedia/en/4/42/Richard_Feynman_Nobel.jpg", width=150)
     st.header("⚙️ Settings")
     topic = st.selectbox("Topic:", ["General", "Mechanics", "Waves", "Electricity", "Modern Physics", "Practicals"])
     
