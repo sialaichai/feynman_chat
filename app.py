@@ -180,23 +180,23 @@ try:
         st.session_state.messages.append({"role": "assistant", "content": response.text})
 
 except Exception as e:
-            # --- DIAGNOSTIC MODE ---
-            st.error(f"❌ Error: {e}")
-            
-            # If it's a 404 or Invalid Argument, we check the models
-            if "404" in str(e) or "not found" in str(e).lower():
-                st.warning(f"⚠️ Model '{model_name}' not found. Listing available models for your Key...")
-                try:
-                    available_models = []
-                    for m in genai.list_models():
-                        if 'generateContent' in m.supported_generation_methods:
-                            available_models.append(m.name)
-                    
-                    if available_models:
-                        st.success(f"✅ Your API Key has access to these models:")
-                        st.code("\n".join(available_models))
-                        st.info("Update the 'model_name' variable in app.py to one of these!")
-                    else:
-                        st.error("❌ Your API Key has NO access to content generation models. Check Google AI Studio settings.")
-                except Exception as inner_e:
-                    st.error(f"Could not list models: {inner_e}")
+    # --- DIAGNOSTIC MODE ---
+    st.error(f"❌ Error: {e}")
+        
+    # If it's a 404 or Invalid Argument, we check the models
+    if "404" in str(e) or "not found" in str(e).lower():
+        st.warning(f"⚠️ Model '{model_name}' not found. Listing available models for your Key...")
+        try:
+            available_models = []
+            for m in genai.list_models():
+                if 'generateContent' in m.supported_generation_methods:
+                    available_models.append(m.name)
+                
+            if available_models:
+                st.success(f"✅ Your API Key has access to these models:")
+                st.code("\n".join(available_models))
+                st.info("Update the 'model_name' variable in app.py to one of these!")
+            else:
+                st.error("❌ Your API Key has NO access to content generation models. Check Google AI Studio settings.")
+        except Exception as inner_e:
+            st.error(f"Could not list models: {inner_e}")
