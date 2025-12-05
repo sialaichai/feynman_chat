@@ -15,7 +15,7 @@ st.set_page_config(
 )
 
 # -----------------------------------------------------------------------------
-# 2. HELPER FUNCTION: PLOT EXECUTOR
+# 2. HELPER FUNCTIONS
 # -----------------------------------------------------------------------------
 def execute_plotting_code(code_snippet):
     """Executes Python code to generate a Matplotlib plot inside Streamlit."""
@@ -28,42 +28,61 @@ def execute_plotting_code(code_snippet):
     except Exception as e:
         st.error(f"Graph Error: {e}")
 
+def display_message(role, content):
+    """
+    Parses message content. 
+    If Python code is found: Hides it in an expander, renders text, then runs code.
+    If no code: Just renders text.
+    """
+    with st.chat_message(role):
+        # Regex to find ```python ... ``` blocks
+        code_match = re.search(r'```python(.*?)```', content, re.DOTALL)
+        
+        if code_match and role == "assistant":
+            # 1. Extract the code
+            python_code = code_match.group(1)
+            
+            # 2. Remove the raw code block from the text so it isn't shown twice
+            # We replace the code block with a small note or empty string
+            text_without_code = content.replace(code_match.group(0), "")
+            st.markdown(text_without_code)
+            
+            # 3. Show the code inside a collapsed expander
+            with st.expander("Show Graph Code (Python)"):
+                st.code(python_code, language='python')
+            
+            # 4. Execute and display the graph
+            execute_plotting_code(python_code)
+        else:
+            # Standard text message
+            st.markdown(content)
+
 # -----------------------------------------------------------------------------
-# 3. SYSTEM INSTRUCTIONS (THE MASTER PROMPT)
+# 3. SYSTEM INSTRUCTIONS
 # -----------------------------------------------------------------------------
 SEAB_H2_MASTER_INSTRUCTIONS = """
 **Identity:**
 You are Richard Feynman. Tutor for Singapore H2 Physics (Syllabus 9478).
 
-**CORE TOOLS & BEHAVIORS:**
+**CORE TOOLS:**
+1.  **Graphing (Python):** If asked to plot/graph, WRITE PYTHON CODE using `matplotlib` and `numpy`. Enclose strictly in ` ```python ` blocks.
+2.  **Sketching (ASCII):** For diagrams (forces, circuits), use ASCII art in code blocks.
+3.  **Vision:** Analyze uploaded images if provided.
 
-1.  **The Visualizer (Two Modes):**
-    * **Mode A (Data/Functions):** If the user asks to "Plot", "Graph", or visualize a formula (like Sine waves or Projectile Motion), **WRITE PYTHON CODE**.
-        * Use `matplotlib.pyplot` and `numpy`.
-        * Enclose strictly in ` ```python ` blocks.
-    * **Mode B (Schematics):** If the user asks for a diagram of objects (like a Free Body Diagram, a Circuit, or Lenses), **DRAW ASCII ART**.
-        * Use code blocks for alignment.
+**PEDAGOGY (SOCRATIC):**
+* Ask **ONE** simple question at a time.
+* Use analogies first (e.g., Voltage = Pressure).
+* **Do not** solve the math immediately. Guide the student.
+* **Summary:** When they understand, provide a summary in a blockquote (`>`).
 
-2.  **The Socratic Guide:**
-    * Ask **ONE** simple question at a time.
-    * Use analogies (Voltage = Water Pressure).
-    * **Do not** solve the math until the student understands the *concept*.
-
-3.  **Vision Capabilities:**
-    * If the user uploads an image, analyze it specifically.
-    * Identify the forces, components, or circuit parts in the image before explaining.
-
-4.  **The Closure:**
-    * When the student understands, provide a **Summary** in a quote block (`>`).
-
-**Syllabus:** SEAB 9478 (Mechanics, Thermal, Waves, Electricity, Modern Physics).
-**Math:** Use LaTeX ($F=ma$) for text formulas.
+**Math:** Use LaTeX ($F=ma$) for formulas.
 """
 
 # -----------------------------------------------------------------------------
-# 4. SIDEBAR (Settings & Image Upload)
+# 4. SIDEBAR
 # -----------------------------------------------------------------------------
 with st.sidebar:
+    # Fixed URL (Removed Markdown brackets to prevent crash)
     st.image("https://upload.wikimedia.org/wikipedia/en/4/42/Richard_Feynman_Nobel.jpg", width=150)
     st.header("⚙️ Settings")
     
@@ -76,7 +95,6 @@ with st.sidebar:
 
     st.divider()
 
-    # --- IMAGE UPLOADER ---
     st.markdown("### 📸 Vision Input")
     uploaded_file = st.file_uploader("Upload a diagram/question", type=["jpg", "png", "jpeg"])
     
@@ -84,7 +102,6 @@ with st.sidebar:
     if uploaded_file:
         image_part = Image.open(uploaded_file)
         st.image(image_part, caption="Image Loaded", use_container_width=True)
-        st.success("Ready to analyze!")
 
     st.divider()
     if st.button("🧹 Clear Chat"):
@@ -92,31 +109,23 @@ with st.sidebar:
         st.rerun()
 
 # -----------------------------------------------------------------------------
-# 5. CHAT LOGIC
+# 5. MAIN CHAT LOGIC
 # -----------------------------------------------------------------------------
 st.title("⚛️ H2 Feynman Bot")
-st.caption(f"Topic: **{topic}** | Vision: **{'On' if image_part else 'Off'}** | Graphing: **On**")
+st.caption(f"Topic: **{topic}** | Vision: **{'On' if image_part else 'Off'}**")
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
-    st.session_state.messages.append({"role": "assistant", "content": "Hello! I can **see** your diagrams, **plot** graphs with code, and **sketch** concepts. What are we solving?"})
+    st.session_state.messages.append({"role": "assistant", "content": "Hello! I can **plot graphs**, see diagrams, and help you understand physics deeply. What's on your mind?"})
 
-# Display History (Text + Rendered Graphs)
+# --- DISPLAY HISTORY (Using the new cleaner function) ---
 for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
-        # Check for previous code graphs
-        if "```python" in msg["content"]:
-            code_match = re.search(r'```python(.*?)```', msg["content"], re.DOTALL)
-            if code_match:
-                with st.expander("Show Graph Code"):
-                    st.code(code_match.group(1), language='python')
-                execute_plotting_code(code_match.group(1))
+    display_message(msg["role"], msg["content"])
 
-# Handle Input
+# --- HANDLE INPUT ---
 if prompt := st.chat_input("Ask a question..."):
     
-    # User Message
+    # Show User Message
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
@@ -132,39 +141,24 @@ if prompt := st.chat_input("Ask a question..."):
             system_instruction=SEAB_H2_MASTER_INSTRUCTIONS
         )
         
-        # --- BUILD CONTENT (TEXT + OPTIONAL IMAGE) ---
-        # Note: We can't easily put images in "chat history" objects for the API yet,
-        # so we send a "fresh" prompt containing the history context + the new image.
-        
-        # 1. Convert past history to a text block (Context)
+        # Prepare Context
         history_text = "\n".join([f"{m['role'].upper()}: {m['content']}" for m in st.session_state.messages if m['role'] != 'system'])
         
-        # 2. Prepare the payload
         final_prompt_parts = []
-        
-        # If there is an image, it goes first
         if image_part:
             final_prompt_parts.append(image_part)
-            final_prompt_parts.append(f"analyzing the image above. [Context: {topic}]")
+            final_prompt_parts.append(f"analyzing the image. [Context: {topic}]")
         
-        # Add the conversation history + new prompt
         final_prompt_parts.append(f"Conversation History:\n{history_text}\n\nUSER: {prompt}\nASSISTANT:")
 
-        # 3. Generate
+        # Generate
         with st.spinner("Thinking..."):
             response = model.generate_content(final_prompt_parts)
         
-        # 4. Display Response
-        with st.chat_message("assistant"):
-            st.markdown(response.text)
-            
-            # CHECK FOR PYTHON CODE (Graphing)
-            if "```python" in response.text:
-                code_match = re.search(r'```python(.*?)```', response.text, re.DOTALL)
-                if code_match:
-                    st.toast("Plotting Graph...", icon="📈")
-                    execute_plotting_code(code_match.group(1))
+        # Display Assistant Message (Using the new cleaner function)
+        display_message("assistant", response.text)
                     
+        # Save to history
         st.session_state.messages.append({"role": "assistant", "content": response.text})
 
     except Exception as e:
