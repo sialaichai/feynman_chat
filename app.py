@@ -276,7 +276,7 @@ if user_input or audio_content or visual_content:
         genai.configure(api_key=api_key)
         
         # --- MODEL: Using 2.5-flash as requested --- gemini-3-pro-preview
-        model_name = "gemini-3-pro-preview" 
+        model_name = "gemini-2.5-flash" 
         
         model = genai.GenerativeModel(
             model_name=model_name, 
