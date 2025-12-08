@@ -4,7 +4,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import re
 from PIL import Image
-
+import os
+import io
+import requests
+from gtts import gTTS
+from duckduckgo_search import DDGS
 # -----------------------------------------------------------------------------
 # 1. PAGE CONFIGURATION
 # -----------------------------------------------------------------------------
