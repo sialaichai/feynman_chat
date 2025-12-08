@@ -159,8 +159,11 @@ SEAB_H2_MASTER_INSTRUCTIONS = """
     * **CRITICAL RULE:** Use **Vectorized Operations** (e.g., `y = np.sin(x)`) instead of `for` loops.
     * **Format:** Enclose strictly in ` ```python ` blocks.
 
-2.  **Sketching (ASCII):** For diagrams (forces, circuits), use ASCII art in code blocks.
-
+2.  **Diagrams (Web Search):** If you need to show a diagram, YOU MUST USE THE TAG.
+    * **Syntax:** `[IMAGE: <concise search query>]`
+    * Example: "Here is the setup: [IMAGE: rutherford gold foil experiment diagram]"
+    * **Rule:** Do NOT use markdown image links. Use `[IMAGE:...]` ONLY.
+    
 3.  **Multimodal Vision & Audio:** * **Vision:** Analyze uploaded images/PDFs.
     * **Audio:** If the user speaks, transcribe the physics question internally and answer it.
 
@@ -181,14 +184,26 @@ with st.sidebar:
     st.image("https://upload.wikimedia.org/wikipedia/en/4/42/Richard_Feynman_Nobel.jpg", width=150)
     
     st.header("⚙️ Settings")
-    topic = st.selectbox("Topic:", ["General", "Mechanics", "Waves", "Electricity", "Modern Physics", "Practicals"])
+    topic = st.selectbox("Topic:", ["General / Any", "Measurement & Uncertainty", "Kinematics & Dynamics", 
+         "Forces & Turnings Effects", "Work, Energy, Power", "Circular Motion", 
+         "Gravitational Fields", "Thermal Physics", "Oscillations & Waves", 
+         "Electricity & DC Circuits", "Electromagnetism (EMI/AC)", "Modern Physics (Quantum/Nuclear)", 
+         "Paper 4: Practical Skills (Spreadsheets)"])
+    enable_voice = st.toggle("🗣️ Read Aloud", value=False)
     
-    if "GOOGLE_API_KEY" in st.secrets:
-        api_key = st.secrets["GOOGLE_API_KEY"]
-    else:
+    api_key = None
+    if "GOOGLE_API_KEY" in os.environ:
+        api_key = os.environ["GOOGLE_API_KEY"]
+    if not api_key:
+        try:
+            if "GOOGLE_API_KEY" in st.secrets:
+                api_key = st.secrets["GOOGLE_API_KEY"]
+        except:
+            pass
+    if not api_key:
         api_key = st.text_input("Enter Google API Key", type="password")
 
-    st.divider()
+    st.divider()    
     
     # --- MULTIMODAL INPUTS ---
     st.markdown("### 📸 Vision & 🎙️ Voice")
@@ -198,7 +213,6 @@ with st.sidebar:
     visual_content = None
     audio_content = None
     
-    # Tab 1: File Uploader
     with tab_upload:
         uploaded_file = st.file_uploader("Upload Image/PDF", type=["jpg", "png", "jpeg", "pdf"])
         if uploaded_file:
@@ -210,7 +224,6 @@ with st.sidebar:
                 st.image(image, caption="Image Loaded", use_container_width=True)
                 visual_content = image
 
-    # Tab 2: Camera
     with tab_cam:
         camera_photo = st.camera_input("Take a photo")
         if camera_photo:
@@ -218,7 +231,6 @@ with st.sidebar:
             visual_content = image
             st.image(image, caption="Camera Photo", use_container_width=True)
 
-    # Tab 3: Microphone
     with tab_mic:
         voice_recording = st.audio_input("Record a question")
         if voice_recording:
