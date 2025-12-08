@@ -82,22 +82,49 @@ def duckduckgo_search_api(query):
 @st.cache_data(show_spinner=False)
 def search_image(query):
     """MASTER FUNCTION: Google Key 1 -> Google Key 2 -> DuckDuckGo"""
-    cx = os.environ.get("GOOGLE_CX")
+    
+    # Helper to find keys in EITHER st.secrets OR os.environ
+    def get_secret(name):
+        if name in st.secrets:
+            return st.secrets[name]
+        return os.environ.get(name)
+
+    cx = get_secret("GOOGLE_CX")
     
     # 1. Try Google Key 1
-    key1 = os.environ.get("GOOGLE_SEARCH_KEY")
+    key1 = get_secret("GOOGLE_SEARCH_KEY")
     if key1 and cx:
         url = google_search_api(query, key1, cx)
         if url: return url
 
     # 2. Try Google Key 2
-    key2 = os.environ.get("GOOGLE_SEARCH_KEY_2")
+    key2 = get_secret("GOOGLE_SEARCH_KEY_2")
     if key2 and cx:
         url = google_search_api(query, key2, cx)
         if url: return url
 
     # 3. Fallback to DuckDuckGo
     return duckduckgo_search_api(query)
+
+@st.cache_data(show_spinner=False)
+#def search_image(query):
+#    """MASTER FUNCTION: Google Key 1 -> Google Key 2 -> DuckDuckGo"""
+#    cx = os.environ.get("GOOGLE_CX")
+    
+    # 1. Try Google Key 1
+#    key1 = os.environ.get("GOOGLE_SEARCH_KEY")
+ #   if key1 and cx:
+#        url = google_search_api(query, key1, cx)
+ #       if url: return url
+
+    # 2. Try Google Key 2
+#    key2 = os.environ.get("GOOGLE_SEARCH_KEY_2")
+#    if key2 and cx:
+#        url = google_search_api(query, key2, cx)
+#        if url: return url
+
+    # 3. Fallback to DuckDuckGo
+ #   return duckduckgo_search_api(query)
     
 def execute_plotting_code(code_snippet):
     """Executes Python code to generate a Matplotlib plot inside Streamlit."""
