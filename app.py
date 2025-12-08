@@ -17,6 +17,84 @@ st.set_page_config(
 # -----------------------------------------------------------------------------
 # 2. HELPER FUNCTIONS
 # -----------------------------------------------------------------------------
+@st.cache_data(show_spinner=False)
+def generate_audio(text):
+    """Generates MP3 audio from text, skipping code/image tags."""
+    # Clean text so the bot doesn't read code or tags out loud
+    clean_text = re.sub(r'```.*?```', 'I have generated a graph.', text, flags=re.DOTALL)
+    clean_text = re.sub(r'\[IMAGE:.*?\]', 'Here is a diagram.', clean_text)
+    try:
+        tts = gTTS(text=clean_text, lang='en')
+        audio_fp = io.BytesIO()
+        tts.write_to_fp(audio_fp)
+        audio_fp.seek(0)
+        return audio_fp
+    except:
+        return None
+
+def google_search_api(query, api_key, cx):
+    """Helper: Performs a single Google Search."""
+    try:
+        url = "https://www.googleapis.com/customsearch/v1"
+        params = {
+            "q": query,
+            "cx": cx,
+            "key": api_key,
+            "searchType": "image",
+            "num": 3,
+            "safe": "active"
+        }
+        
+        response = requests.get(url, params=params)
+        
+        if response.status_code in [403, 429]:
+            return None # Failover trigger
+            
+        data = response.json()
+        
+        if "items" in data and len(data["items"]) > 0:
+            for item in data["items"]:
+                link = item["link"]
+                if link.lower().endswith(('.jpg', '.jpeg', '.png')):
+                    return link
+            return data["items"][0]["link"]
+            
+    except Exception as e:
+        print(f"Google API Exception: {e}")
+        return None
+    return None
+
+def duckduckgo_search_api(query):
+    """Helper: Fallback search using DuckDuckGo."""
+    try:
+        with DDGS() as ddgs:
+            results = list(ddgs.images(query, max_results=1))
+            if results:
+                return results[0]['image']
+    except Exception as e:
+        return f"Search Error: {e}"
+    return "No image found."
+
+@st.cache_data(show_spinner=False)
+def search_image(query):
+    """MASTER FUNCTION: Google Key 1 -> Google Key 2 -> DuckDuckGo"""
+    cx = os.environ.get("GOOGLE_CX")
+    
+    # 1. Try Google Key 1
+    key1 = os.environ.get("GOOGLE_SEARCH_KEY")
+    if key1 and cx:
+        url = google_search_api(query, key1, cx)
+        if url: return url
+
+    # 2. Try Google Key 2
+    key2 = os.environ.get("GOOGLE_SEARCH_KEY_2")
+    if key2 and cx:
+        url = google_search_api(query, key2, cx)
+        if url: return url
+
+    # 3. Fallback to DuckDuckGo
+    return duckduckgo_search_api(query)
+    
 def execute_plotting_code(code_snippet):
     """Executes Python code to generate a Matplotlib plot inside Streamlit."""
     try:
@@ -28,27 +106,52 @@ def execute_plotting_code(code_snippet):
     except Exception as e:
         st.error(f"Graph Error: {e}")
 
-def display_message(role, content):
-    """Parses message content to hide Python code behind an expander."""
+def display_message(role, content, enable_voice=False):
     with st.chat_message(role):
+        
+        text_to_display = content
+        
+        # 1. Check for Python Code
         code_match = re.search(r'```python(.*?)```', content, re.DOTALL)
         if code_match and role == "assistant":
-            python_code = code_match.group(1)
-            text_without_code = content.replace(code_match.group(0), "")
-            st.markdown(text_without_code)
+            text_to_display = text_to_display.replace(code_match.group(0), "")
+        
+        # 2. Check for [IMAGE: query] Tags
+        image_match = re.search(r'\[IMAGE:\s*(.*?)\]', text_to_display, re.IGNORECASE)
+        image_result = None
+        
+        if image_match and role == "assistant":
+            search_query = image_match.group(1)
+            text_to_display = text_to_display.replace(image_match.group(0), "")
+            image_result = search_image(search_query)
+
+        # --- DISPLAY ---
+        st.markdown(text_to_display)
+
+        if code_match and role == "assistant":
+            with st.expander("Show Graph Code"):
+                st.code(code_match.group(1), language='python')
+            execute_plotting_code(code_match.group(1))
             
-            with st.expander("Show Graph Code (Python)"):
-                st.code(python_code, language='python')
-            execute_plotting_code(python_code)
-        else:
-            st.markdown(content)
+        if image_match and role == "assistant":
+            if image_result and "Error" not in image_result:
+                st.image(image_result, caption=f"Diagram: {image_match.group(1)}")
+                st.markdown(f"[🔗 Open Image in New Tab]({image_result})")
+            else:
+                st.warning(f"⚠️ Image Search Failed: {image_result}")
+
+        if enable_voice and role == "assistant" and len(text_to_display.strip()) > 0:
+            audio_bytes = generate_audio(text_to_display)
+            if audio_bytes:
+                st.audio(audio_bytes, format='audio/mp3')
+
 
 # -----------------------------------------------------------------------------
 # 3. SYSTEM INSTRUCTIONS
 # -----------------------------------------------------------------------------
 SEAB_H2_MASTER_INSTRUCTIONS = """
-**Identity:**
-You are Richard Feynman. Tutor for Singapore H2 Physics (Syllabus 9478).
+**Identity:** Richard Feynman. Tutor for Singapore H2 Physics (9478).
+**CORE DIRECTIVE:** STRICTLY adhere to the Syllabus SEAB H2 Physics 9478 topics. Reject non-included topics from UK A-level physics.
 
 **CORE TOOLS:**
 1.  **Graphing (Python):** If asked to plot/graph, WRITE PYTHON CODE.
