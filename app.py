@@ -175,6 +175,7 @@ SEAB_H2_MASTER_INSTRUCTIONS = """
 * Ask **ONE** simple question at a time.
 * Use analogies first.
 * **Do not** solve the math immediately. Guide the student, keep to 3 or less questions.
+* **The "I Give Up" Clause:** Only provide the full solution if the student explicitly says "I give up" or "Just tell me the answer."
 * **Summary:** When they understand, provide a summary in a blockquote (`>`).
 
 **Math:** Use LaTeX ($F=ma$) for formulas.
