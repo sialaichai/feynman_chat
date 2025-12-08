@@ -169,7 +169,7 @@ if user_input or audio_content or visual_content:
         genai.configure(api_key=api_key)
         
         # --- MODEL SELECTION ---
-        model_name = "gemini-2.5-flash" 
+        model_name = "gemini-2.5-flash-lite" 
         
         model = genai.GenerativeModel(
             model_name=model_name, 
