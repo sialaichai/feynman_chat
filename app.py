@@ -256,6 +256,31 @@ if visual_content: mode_label = "Vision"
 if audio_content: mode_label = "Voice"
 
 st.title("⚛️ H2Physics Feynman Bot")
+# --- DIAGNOSTIC: PASTE THIS UNDER st.title ---
+    with st.expander("🔑 Secrets Diagnostic (Click to expand)"):
+        st.write("Checking st.secrets...")
+        
+        # Check CX
+        if "GOOGLE_CX" in st.secrets:
+            st.success("✅ GOOGLE_CX found!")
+        else:
+            st.error("❌ GOOGLE_CX is missing from secrets.")
+            
+        # Check Key 1
+        if "GOOGLE_SEARCH_KEY" in st.secrets:
+            st.success("✅ GOOGLE_SEARCH_KEY found!")
+        else:
+            st.error("❌ GOOGLE_SEARCH_KEY is missing from secrets.")
+            
+        # Check Key 2
+        if "GOOGLE_SEARCH_KEY_2" in st.secrets:
+            st.success("✅ GOOGLE_SEARCH_KEY_2 found!")
+        else:
+            st.warning("⚠️ GOOGLE_SEARCH_KEY_2 missing (Optional).")
+    # ---------------------------------------------
+
+
+
 st.caption(f"Topic: **{topic}** | Mode: **{mode_label}**")
 
 if "messages" not in st.session_state:
