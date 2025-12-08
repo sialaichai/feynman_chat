@@ -4,3 +4,6 @@ matplotlib
 numpy
 Pillow
 scipy
+gTTS
+requests
+duckduckgo-search
