@@ -192,8 +192,8 @@ with st.sidebar:
     enable_voice = st.toggle("🗣️ Read Aloud", value=False)
     
     api_key = None
-    if "GOOGLE_API_KEY" in os.environ:
-        api_key = os.environ["GOOGLE_API_KEY"]
+    if "GOOGLE_API_KEY" in st.secrets:
+        api_key = st.secrets["GOOGLE_API_KEY"]
     if not api_key:
         try:
             if "GOOGLE_API_KEY" in st.secrets:
