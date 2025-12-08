@@ -194,15 +194,8 @@ with st.sidebar:
     api_key = None
     if "GOOGLE_API_KEY" in st.secrets:
         api_key = st.secrets["GOOGLE_API_KEY"]
-    if not api_key:
-        try:
-            if "GOOGLE_API_KEY" in st.secrets:
-                api_key = st.secrets["GOOGLE_API_KEY"]
-        except:
-            pass
-    if not api_key:
+    else:
         api_key = st.text_input("Enter Google API Key", type="password")
-
     st.divider()    
     
     # --- MULTIMODAL INPUTS ---
