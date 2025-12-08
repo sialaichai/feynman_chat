@@ -243,15 +243,15 @@ mode_label = "Text"
 if visual_content: mode_label = "Vision"
 if audio_content: mode_label = "Voice"
 
-st.title("⚛️ H2 Feynman Bot")
+st.title("⚛️ H2Physics Feynman Bot")
 st.caption(f"Topic: **{topic}** | Mode: **{mode_label}**")
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
-    st.session_state.messages.append({"role": "assistant", "content": "Hello! I can **see** (images/PDFs), **hear** your questions (Voice), and **plot graphs**. How can I help?"})
+    st.session_state.messages.append({"role": "assistant", "content": "Hello JPJC Physics students! I can **find diagrams**, **plot graphs**, and **see** your work. What can I explain?"})
 
 for msg in st.session_state.messages:
-    display_message(msg["role"], msg["content"])
+    display_message(msg["role"], msg["content"], enable_voice)
 
 # Allow empty text prompt IF there is audio or image
 user_input = st.chat_input("Type OR Record/Upload...")
@@ -272,33 +272,31 @@ if user_input or audio_content or visual_content:
         st.error("Key missing.")
         st.stop()
 
-    # --- GENERATION LOGIC ---
     try:
         genai.configure(api_key=api_key)
         
-        # --- MODEL SELECTION ---
-        model_name = "gemini-2.5-flash-lite" 
+        # --- MODEL: Using 2.5-flash as requested ---
+        model_name = "gemini-2.0-flash-lite" 
         
         model = genai.GenerativeModel(
             model_name=model_name, 
             system_instruction=SEAB_H2_MASTER_INSTRUCTIONS
         )
         
-        # Build Context
-        history_text = "\n".join([f"{m['role'].upper()}: {m['content']}" for m in st.session_state.messages if m['role'] != 'system'])
+        #history_text = "\n".join([f"{m['role'].upper()}: {m['content']}" for m in st.session_state.messages if m['role'] != 'system'])
+        # Only keep the last 10 messages to save tokens
+        recent_messages = st.session_state.messages[-10:] 
+        history_text = "\n".join([f"{m['role'].upper()}: {m['content']}" for m in recent_messages if m['role'] != 'system'])
         final_prompt = []
         
-        # 1. Add Visuals
         if visual_content:
             final_prompt.append(visual_content)
             final_prompt.append(f"Analyze this image/document. [Context: {topic}]")
-            
-        # 2. Add Audio
+        
         if audio_content:
             final_prompt.append(audio_content)
             final_prompt.append(f"Listen to this student's question about {topic}. Respond textually.")
 
-        # 3. Add Text
         if user_input:
             final_prompt.append(f"USER TEXT: {user_input}")
 
@@ -307,8 +305,9 @@ if user_input or audio_content or visual_content:
         with st.spinner("Processing..."):
             response = model.generate_content(final_prompt)
         
-        display_message("assistant", response.text)
+        display_message("assistant", response.text, enable_voice)
         st.session_state.messages.append({"role": "assistant", "content": response.text})
+
 
     except Exception as e:
         # --- FIX 2: DIAGNOSTIC MODE RESTORED ---
