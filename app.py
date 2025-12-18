@@ -193,7 +193,7 @@ st.title("⚛️ H2Physics Feynman Bot")
 
 # --- SETTINGS EXPANDER (Topic, Key, Diagnostics) ---
 with st.expander("⚙️ Settings", expanded=False):
-    st.image("[https://upload.wikimedia.org/wikipedia/en/4/42/Richard_Feynman_Nobel.jpg](https://upload.wikimedia.org/wikipedia/en/4/42/Richard_Feynman_Nobel.jpg)", width=100)
+    st.image("https://upload.wikimedia.org/wikipedia/en/4/42/Richard_Feynman_Nobel.jpg", width=100)
     
     topic = st.selectbox("Topic:", ["General / Any", "Measurement & Uncertainty", "Kinematics & Dynamics", 
             "Forces & Turnings Effects", "Work, Energy, Power", "Circular Motion", 
