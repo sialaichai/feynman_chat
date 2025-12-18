@@ -209,10 +209,8 @@ USER_LEVEL_INSTRUCTIONS = {
 # -----------------------------------------------------------------------------
 # 4. MAIN PAGE LAYOUT & SETTINGS
 # -----------------------------------------------------------------------------
-st.title("⚛️ H2Physics Feynman Bot")
+st.title("⚛️ JPJC H2Physics Feynman Bot")
 
-# --- USER LEVEL SELECTION ---
-user_level = st.radio("Select Competency Level:", ["Beginner", "Intermediate", "Advance"], horizontal=True)
 
 # --- SETTINGS EXPANDER (Topic, Key, Diagnostics) ---
 with st.expander("⚙️ Settings", expanded=False):
@@ -252,6 +250,8 @@ with st.expander("⚙️ Settings", expanded=False):
     else:
         st.warning("⚠️ GOOGLE_SEARCH_KEY_2 missing (Optional).")
 
+# --- USER LEVEL SELECTION ---
+user_level = st.radio("Select Competency Level:", ["Beginner", "Intermediate", "Advance"], horizontal=True)
 
 # --- CENTRAL CONTROL ROW (Voice & Clear Chat) ---
 col_voice, col_clear = st.columns(2)
