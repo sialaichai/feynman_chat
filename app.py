@@ -175,9 +175,6 @@ SEAB_H2_MASTER_INSTRUCTIONS = """
     * **Syntax:** `[IMAGE: <concise search query>]`
     * Example: "Here is the setup: [IMAGE: rutherford gold foil experiment diagram]"
     * **Rule:** Do NOT use markdown image links. Use `[IMAGE:...]` ONLY.
-    
-3.  **Multimodal Vision & Audio:** * **Vision:** Analyze uploaded images/PDFs.
-    * **Audio:** If the user speaks, transcribe the physics question internally and answer it.
 
 **PEDAGOGY (SOCRATIC):**
 * Ask **ONE** simple question at a time.
@@ -196,7 +193,7 @@ st.title("⚛️ H2Physics Feynman Bot")
 
 # --- SETTINGS EXPANDER (Topic, Key, Diagnostics) ---
 with st.expander("⚙️ Settings", expanded=False):
-    st.image("https://upload.wikimedia.org/wikipedia/en/4/42/Richard_Feynman_Nobel.jpg", width=100)
+    st.image("[https://upload.wikimedia.org/wikipedia/en/4/42/Richard_Feynman_Nobel.jpg](https://upload.wikimedia.org/wikipedia/en/4/42/Richard_Feynman_Nobel.jpg)", width=100)
     
     topic = st.selectbox("Topic:", ["General / Any", "Measurement & Uncertainty", "Kinematics & Dynamics", 
             "Forces & Turnings Effects", "Work, Energy, Power", "Circular Motion", 
