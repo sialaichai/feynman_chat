@@ -190,42 +190,30 @@ SEAB_H2_MASTER_INSTRUCTIONS = """
 """
 
 # -----------------------------------------------------------------------------
-# 4. MAIN PAGE LAYOUT & SETTINGS (Moved from Sidebar)
+# 4. MAIN PAGE LAYOUT & SETTINGS
 # -----------------------------------------------------------------------------
-st.title("⚛️ JPJC H2Physics Feynman Bot")
+st.title("⚛️ H2Physics Feynman Bot")
 
-# Container for controls to keep them organized in the main view
-with st.expander("⚙️ Settings & Controls", expanded=False):
-    col1, col2 = st.columns([1, 2])
+# --- SETTINGS EXPANDER (Topic, Key, Diagnostics) ---
+with st.expander("⚙️ Settings", expanded=False):
+    st.image("[https://upload.wikimedia.org/wikipedia/en/4/42/Richard_Feynman_Nobel.jpg](https://upload.wikimedia.org/wikipedia/en/4/42/Richard_Feynman_Nobel.jpg)", width=100)
     
-    with col1:
-        st.image("https://upload.wikimedia.org/wikipedia/en/4/42/Richard_Feynman_Nobel.jpg", width=120)
-        enable_voice = st.toggle("🗣️ Read Aloud", value=False)
+    topic = st.selectbox("Topic:", ["General / Any", "Measurement & Uncertainty", "Kinematics & Dynamics", 
+            "Forces & Turnings Effects", "Work, Energy, Power", "Circular Motion", 
+            "Gravitational Fields", "Thermal Physics", "Oscillations & Waves", 
+            "Electricity & DC Circuits", "Electromagnetism (EMI/AC)", "Modern Physics (Quantum/Nuclear)", 
+            "Paper 4: Practical Skills (Spreadsheets)"])
     
-    with col2:
-        topic = st.selectbox("Topic:", ["General / Any", "Measurement & Uncertainty", "Kinematics & Dynamics", 
-             "Forces & Turnings Effects", "Work, Energy, Power", "Circular Motion", 
-             "Gravitational Fields", "Thermal Physics", "Oscillations & Waves", 
-             "Electricity & DC Circuits", "Electromagnetism (EMI/AC)", "Modern Physics (Quantum/Nuclear)", 
-             "Paper 4: Practical Skills (Spreadsheets)"])
-        
-        api_key = None
-        if "GOOGLE_API_KEY" in st.secrets:
-            api_key = st.secrets["GOOGLE_API_KEY"]
-        else:
-            api_key = st.text_input("Enter Google API Key", type="password")
-            
-        if st.button("🧹 Clear Chat"):
-            st.session_state.messages = []
-            st.rerun()
-
-# -----------------------------------------------------------------------------
-# 5. MAIN CHAT LOGIC
-# -----------------------------------------------------------------------------
-# --- DIAGNOSTIC: PASTE THIS UNDER st.title ---
-with st.expander("🔑 Secrets Diagnostic (Click to expand)"):
-    st.write("Checking st.secrets...")
-        
+    api_key = None
+    if "GOOGLE_API_KEY" in st.secrets:
+        api_key = st.secrets["GOOGLE_API_KEY"]
+    else:
+        api_key = st.text_input("Enter Google API Key", type="password")
+    
+    st.divider()
+    
+    # --- DIAGNOSTIC: Moved Inside Settings ---
+    st.markdown("**🔑 Secrets Diagnostic**")
     # Check CX
     if "GOOGLE_CX" in st.secrets:
         st.success("✅ GOOGLE_CX found!")
@@ -243,8 +231,20 @@ with st.expander("🔑 Secrets Diagnostic (Click to expand)"):
         st.success("✅ GOOGLE_SEARCH_KEY_2 found!")
     else:
         st.warning("⚠️ GOOGLE_SEARCH_KEY_2 missing (Optional).")
-    # ---------------------------------------------
 
+
+# --- CENTRAL CONTROL ROW (Voice & Clear Chat) ---
+col_voice, col_clear = st.columns(2)
+with col_voice:
+    enable_voice = st.toggle("🗣️ Read Aloud", value=False)
+with col_clear:
+    if st.button("🧹 Clear Chat", use_container_width=True):
+        st.session_state.messages = []
+        st.rerun()
+
+# -----------------------------------------------------------------------------
+# 5. MAIN CHAT LOGIC
+# -----------------------------------------------------------------------------
 st.caption(f"Topic: **{topic}**")
 
 if "messages" not in st.session_state:
@@ -294,7 +294,6 @@ if user_input:
         st.session_state.messages.append({"role": "assistant", "content": response.text})
 
     except Exception as e:
-        # --- FIX 2: DIAGNOSTIC MODE RESTORED ---
         st.error(f"❌ Error: {e}")
         
         # Check for Model Availability Errors
