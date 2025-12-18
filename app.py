@@ -200,7 +200,7 @@ SEAB_H2_MASTER_INSTRUCTIONS = """
 
 CORE_PEDAGOGY = """
 **PEDAGOGY (SOCRATIC):**
-* Ask **ONE** simple question at a time, keep to 3 or less questions.
+* Ask **ONE** simple question at a time, limit to 3 or less questions.
 * Use analogies first.
 * **Do not** solve the math immediately. Guide the student.
 * **The "I Give Up" Clause:** Only provide the full solution if the student explicitly says "I give up" or "Just tell me the answer."
