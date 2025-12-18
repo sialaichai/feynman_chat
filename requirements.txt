@@ -6,4 +6,4 @@ Pillow
 scipy
 gTTS
 requests
-duckduckgo-search
+duckduckgo_search>=6.0.0
