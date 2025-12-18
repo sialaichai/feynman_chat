@@ -189,7 +189,7 @@ SEAB_H2_MASTER_INSTRUCTIONS = """
 # -----------------------------------------------------------------------------
 # 4. MAIN PAGE LAYOUT & SETTINGS
 # -----------------------------------------------------------------------------
-st.title("⚛️ H2Physics Feynman Bot")
+st.title("⚛️JPJC H2Physics Feynman Bot")
 
 # --- SETTINGS EXPANDER (Topic, Key, Diagnostics) ---
 with st.expander("⚙️ Settings", expanded=False):
