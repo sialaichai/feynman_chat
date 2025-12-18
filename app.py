@@ -69,16 +69,35 @@ def google_search_api(query, api_key, cx):
         return None
     return None
 
+#def duckduckgo_search_api(query):
+#    """Helper: Fallback search using DuckDuckGo."""
+#    try:
+#        with DDGS() as ddgs:
+#            results = list(ddgs.images(query, max_results=1))
+#            if results:
+#                return results[0]['image']
+#    except Exception as e:
+#        return f"Search Error: {e}"
+#    return "No image found."
+
 def duckduckgo_search_api(query):
-    """Helper: Fallback search using DuckDuckGo."""
+    """Improved Fallback search with headers and region."""
     try:
-        with DDGS() as ddgs:
-            results = list(ddgs.images(query, max_results=1))
-            if results:
-                return results[0]['image']
+        # Adding a region like 'wt-wt' (No region) or 'us-en' can help
+        with DDGS(timeout=20) as ddgs:
+            # Explicitly naming the 'keywords' parameter is safer in newer versions
+            results = ddgs.images(keywords=query, region='wt-wt', safesearch='moderate')
+            
+            # Using next() on the generator is faster for max_results=1
+            first_result = next(results, None)
+            if first_result:
+                return first_result['image']
     except Exception as e:
         return f"Search Error: {e}"
     return "No image found."
+    
+
+
 
 @st.cache_data(show_spinner=False)
 def search_image(query):
