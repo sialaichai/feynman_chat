@@ -199,7 +199,7 @@ with st.expander("⚙️ Settings & Controls", expanded=False):
     col1, col2 = st.columns([1, 2])
     
     with col1:
-        st.image("[https://upload.wikimedia.org/wikipedia/en/4/42/Richard_Feynman_Nobel.jpg](https://upload.wikimedia.org/wikipedia/en/4/42/Richard_Feynman_Nobel.jpg)", width=120)
+        st.image("https://upload.wikimedia.org/wikipedia/en/4/42/Richard_Feynman_Nobel.jpg", width=120)
         enable_voice = st.toggle("🗣️ Read Aloud", value=False)
     
     with col2:
