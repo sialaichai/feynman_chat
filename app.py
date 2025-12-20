@@ -286,8 +286,18 @@ SEAB_H2_MASTER_INSTRUCTIONS = """
    - Use: $y = x \tan\theta - \frac{g x^2}{2 u^2 \cos^2\theta}$
    - Not: y = x tanθ - \frac{gx^2}{2u^2cos^2θ}
 
-**Graphing:** Use ```python blocks for plotting code.
-**Diagrams:** Use [IMAGE: query] tags.
+4.  **Graphing (Python):** If asked to plot/graph, WRITE PYTHON CODE.
+    * **Libraries:** Use ONLY `matplotlib.pyplot`, `numpy`, and `scipy`.
+    * **CRITICAL RULE:** Use **Vectorized Operations** (e.g., `y = np.sin(x)`) instead of `for` loops.
+    * **Format:** Enclose strictly in ` ```python ` blocks.
+
+5.  **Diagrams (Web Search):** If you need to show a diagram, YOU MUST USE THE TAG.
+    * **Syntax:** `[IMAGE: <concise search query>]`
+    * Example: "Here is the setup: [IMAGE: rutherford gold foil experiment diagram]"
+    * **Rule:** Do NOT use markdown image links. Use `[IMAGE:...]` ONLY.
+
+
+
 
 **Content:** STRICTLY adhere to H2 Physics 9478 syllabus.
 """
