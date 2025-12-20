@@ -12,7 +12,7 @@ import time
 # Add LaTeX support via custom CSS
 #st.markdown("""
 #<style>
-    /* Enable LaTeX rendering in all markdown */
+#   /* Enable LaTeX rendering in all markdown */
 #    .stMarkdown {
 #        font-size: 16px;
 #    }
