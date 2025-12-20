@@ -412,66 +412,62 @@ def execute_plotting_code(code_snippet):
 def display_message(role, content, enable_voice=False):
     with st.chat_message(role):
         
-        # STEP 1: Extract Python code blocks FIRST
+        # STEP 1: Extract code blocks
         code_blocks = []
         display_content = content
         
-        # Find and remove ALL Python code blocks from the displayed text
         for match in re.finditer(r'```python(.*?)```', content, re.DOTALL):
-            code_blocks.append(match.group(1))  # Save the code
-            # Remove the entire ```python ... ``` block from displayed content
+            code_blocks.append(match.group(1))
             display_content = display_content.replace(match.group(0), "")
         
-        # STEP 2: Extract image tags similarly
+        # STEP 2: Extract image tags
         image_match = re.search(r'\[IMAGE:\s*(.*?)\]', display_content, re.IGNORECASE)
-        image_result = None
         image_query = None
         
         if image_match and role == "assistant":
             image_query = image_match.group(1)
             display_content = display_content.replace(image_match.group(0), "")
         
-        # STEP 3: CONVERT PARENTHESES TO PROPER LATEX AND RENDER
-        # First, convert any ( \vec{E} ) patterns to $\vec{E}$
-        display_content = re.sub(r'\(\\[^)]+\)', lambda m: f'${m.group(0)[1:-1]}$', display_content)
+        # STEP 3: CRITICAL FIX - Convert parentheses to $ delimiters
+        # Convert ( \vec{E} ) to $\vec{E}$ and similar patterns
+        import re
         
-        # Also convert simple ( v = E/B ) patterns
-        display_content = re.sub(r'\(([^()]*\\[^()]+[^()]*)\)', lambda m: f'${m.group(1)}$', display_content)
+        # Pattern 1: ( \command{...} )
+        display_content = re.sub(
+            r'\(\\[a-zA-Z]+\{[^}]*\}\)', 
+            lambda m: f'${m.group(0)[1:-1]}$', 
+            display_content
+        )
         
-        # STEP 4: SPLIT AND RENDER CONTENT WITH LATEX PROPERLY
-        if '$' in display_content:
-            # Split by LaTeX expressions (both inline and display)
-            parts = re.split(r'(\$\$.*?\$\$|\$.*?\$)', display_content)
-            
-            for part in parts:
-                if not part:
-                    continue
-                elif part.startswith('$$') and part.endswith('$$'):
-                    # Display equation (centered)
-                    st.latex(part[2:-2])  # Remove the $$ delimiters
-                elif part.startswith('$') and part.endswith('$'):
-                    # Inline equation
-                    st.latex(part[1:-1])  # Remove the $ delimiters
-                else:
-                    # Regular text - render as markdown
-                    st.markdown(part, unsafe_allow_html=False)
-        else:
-            # No LaTeX, just render normally
-            st.markdown(display_content, unsafe_allow_html=False)
+        # Pattern 2: ( content with LaTeX )
+        display_content = re.sub(
+            r'\(([^)]*\\[^)]*)\)', 
+            lambda m: f'${m.group(1)}$', 
+            display_content
+        )
         
-        # STEP 5: Handle Python code blocks - ONLY in expander
+        # Pattern 3: Variables like θ, φ, etc. (common in your example)
+        display_content = re.sub(
+            r'([\s\(])([θφαβγδεζηλμνξπρστυχψω])', 
+            lambda m: f'{m.group(1)}$\{m.group(2)}$', 
+            display_content
+        )
+        
+        # STEP 4: SIMPLE RENDERING - Let KaTeX handle everything
+        # Just render the entire content as markdown
+        st.markdown(display_content, unsafe_allow_html=False)
+        
+        # STEP 5: Handle code blocks
         if code_blocks and role == "assistant":
-            # Execute the FIRST code block to generate the graph
             execute_plotting_code(code_blocks[0])
             
-            # Create ONE expander for all code blocks
             with st.expander("📊 Show/Hide Graph Code"):
                 for i, code in enumerate(code_blocks):
                     if len(code_blocks) > 1:
                         st.markdown(f"**Code block {i+1}:**")
                     st.code(code, language='python')
         
-        # STEP 5: Handle image search (keep as is)
+        # STEP 6: Handle images
         if image_match and role == "assistant" and image_query:
             image_result = search_image(image_query)
             if image_result and "Error" not in image_result:
@@ -480,7 +476,7 @@ def display_message(role, content, enable_voice=False):
             else:
                 st.warning(f"⚠️ Image Search Failed: {image_result}")
         
-        # STEP 6: Handle voice (use the improved cleaner we discussed)
+        # STEP 7: Handle voice
         if enable_voice and role == "assistant" and len(display_content.strip()) > 0:
             clean_text = clean_physics_text_for_speech(display_content)
             audio_bytes = generate_audio(clean_text)
