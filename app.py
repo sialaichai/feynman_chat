@@ -116,42 +116,54 @@ def execute_plotting_code(code_snippet):
 def display_message(role, content, enable_voice=False):
     with st.chat_message(role):
         
-        # STEP 1: Pre-process content to ensure LaTeX is properly formatted
-        # This ensures all equations use $$ for display math
-        processed_content = content
+        # STEP 1: Extract Python code blocks FIRST
+        code_blocks = []
+        display_content = content
         
-        # Check if content has LaTeX but not properly wrapped
-        if '\\frac' in content or '\\int' in content or '\\sum' in content:
-            # You can add more sophisticated processing here if needed
-            pass
+        # Find and remove ALL Python code blocks from the displayed text
+        # Using finditer to get all matches
+        for match in re.finditer(r'```python(.*?)```', content, re.DOTALL):
+            code_blocks.append(match.group(1))  # Save the code
+            # Remove the entire ```python ... ``` block from displayed content
+            display_content = display_content.replace(match.group(0), "")
         
-        # STEP 2: Use st.markdown with latex support
-        # This is the crucial line that enables LaTeX rendering
-        st.markdown(processed_content, unsafe_allow_html=False)
+        # STEP 2: Extract image tags similarly
+        image_match = re.search(r'\[IMAGE:\s*(.*?)\]', display_content, re.IGNORECASE)
+        image_result = None
+        image_query = None
         
-        # STEP 3: Handle code blocks (for graphs)
-        code_match = re.search(r'```python(.*?)```', content, re.DOTALL)
-        if code_match and role == "assistant":
-        #    with st.expander("Show Graph Code"):
-        #       st.code(code_match.group(1), language='python')
-            text_to_display = text_to_display.replace(code_match.group(0), "")
-            execute_plotting_code(code_match.group(1))
-               
-        # STEP 4: Handle image search tags
-        image_match = re.search(r'\[IMAGE:\s*(.*?)\]', content, re.IGNORECASE)
         if image_match and role == "assistant":
-            search_query = image_match.group(1)
-            image_result = search_image(search_query)
+            image_query = image_match.group(1)
+            display_content = display_content.replace(image_match.group(0), "")
+        
+        # STEP 3: Display the cleaned text (without code blocks)
+        st.markdown(display_content)
+        
+        # STEP 4: Handle Python code blocks - ONLY in expander
+        if code_blocks and role == "assistant":
+            # Execute the FIRST code block to generate the graph
+            # (Assuming you want to execute the first one for graphing)
+            execute_plotting_code(code_blocks[0])
+            
+            # Create ONE expander for all code blocks
+            with st.expander("📊 Show/Hide Graph Code"):
+                for i, code in enumerate(code_blocks):
+                    if len(code_blocks) > 1:
+                        st.markdown(f"**Code block {i+1}:**")
+                    st.code(code, language='python')
+        
+        # STEP 5: Handle image search (keep as is)
+        if image_match and role == "assistant" and image_query:
+            image_result = search_image(image_query)
             if image_result and "Error" not in image_result:
-                st.image(image_result, caption=f"Diagram: {image_match.group(1)}")
+                st.image(image_result, caption=f"Diagram: {image_query}")
                 st.markdown(f"[🔗 Open Image in New Tab]({image_result})")
             else:
                 st.warning(f"⚠️ Image Search Failed: {image_result}")
         
-        # STEP 5: Handle voice
-        if enable_voice and role == "assistant" and len(content.strip()) > 0:
-            # For voice, we should use the original content (with LaTeX removed)
-            clean_text = re.sub(r'\$.*?\$', 'mathematical expression', content)
+        # STEP 6: Handle voice (keep as is)
+        if enable_voice and role == "assistant" and len(display_content.strip()) > 0:
+            clean_text = re.sub(r'\$.*?\$', 'mathematical expression', display_content)
             clean_text = re.sub(r'\\[a-zA-Z]+', '', clean_text)
             audio_bytes = generate_audio(clean_text)
             if audio_bytes:
