@@ -434,83 +434,63 @@ def display_message(role, content, enable_voice=False):
             image_query = image_match.group(1)
             display_content = display_content.replace(image_match.group(0), "")
         
-        # STEP 3: COMPREHENSIVE LATEX FIX - Handle ALL cases
-        def fix_all_latex(text):
-            """Fix all types of LaTeX formatting issues in one pass."""
-            
-            # Case 1: Already correct with $ delimiters - leave them
-            # (No change needed for $u \cos \theta$)
-            
-            # Case 2: Fix raw LaTeX commands without $
-            # Pattern for \command{...} without $ (like \cos\theta, \frac{1}{2})
-            patterns_to_wrap = [
-                (r'\\[a-zA-Z]+\{', r'\\frac{', r'\\sin{', r'\\cos{', 
-                 r'\\tan{', r'\\vec{', r'\\hat{', r'\\overline{'),
+        # STEP 3: FIXED - Proper regex patterns
+        # Fix the problematic pattern that caused the error
+        display_content = re.sub(r'u \\\\cos \\\\theta t', r'$u \\cos \\theta$ t', display_content)
+        display_content = re.sub(r'u \\\\sin \\\\theta t', r'$u \\sin \\theta$ t', display_content)
+        
+        # STEP 4: Better approach - Comprehensive LaTeX fix
+        # Fix ALL LaTeX patterns systematically
+        def fix_broken_latex(text):
+            """Fix broken LaTeX formatting."""
+            # Pattern 1: Fix raw LaTeX commands (no $)
+            # Match \command or \command{...} without $ before or after
+            patterns = [
+                # Fractions: \frac{1}{2} -> $\frac{1}{2}$
+                (r'(?<!\$)\\\\frac\{([^}]+)\}\{([^}]+)\}(?!\$\w)', r'$\\frac{\1}{\2}$'),
+                
+                # Trigonometric: \cos\theta -> $\cos\theta$
+                (r'(?<!\$)\\\\(cos|sin|tan)\s*([a-zA-Zα-ωΑ-Ω]+)(?!\$\w)', r'$\\\1 \2$'),
+                
+                # Greek letters: \theta -> $\theta$
+                (r'(?<!\$)\\\\(alpha|beta|gamma|delta|epsilon|zeta|eta|theta|iota|kappa|lambda|mu|nu|xi|pi|rho|sigma|tau|phi|chi|psi|omega)(?!\$\w)', r'$\\\1$'),
+                
+                # Subscripts: a_y -> $a_y$
+                (r'(?<!\$)([a-zA-Z])_([a-zA-Z0-9])(?!\$\w)', r'$\1_\2$'),
+                
+                # Powers: t^2 -> $t^2$
+                (r'(?<!\$)([a-zA-Z])\^([0-9])(?!\$\w)', r'$\1^{\2}$'),
             ]
             
-            # Convert \frac{1}{2} to $\frac{1}{2}$
-            text = re.sub(r'(?<!\$)\\frac\{([^}]+)\}\{([^}]+)\}(?!\$)', r'$\frac{\1}{\2}$', text)
-            
-            # Convert \cos\theta to $\cos\theta$ (when not already wrapped)
-            text = re.sub(r'(?<!\$)\\(cos|sin|tan|cot|sec|csc)\s*([a-zA-Zα-ωΑ-Ω_0-9]+)(?!\$)', r'$\\\1 \2$', text)
-            
-            # Convert \vec{E} to $\vec{E}$
-            text = re.sub(r'(?<!\$)\\(vec|hat|overline)\{([^}]+)\}(?!\$)', r'$\\\1{\2}$', text)
-            
-            # Convert Greek letters without $: \theta to $\theta$
-            text = re.sub(r'(?<!\$)\\(alpha|beta|gamma|delta|epsilon|zeta|eta|theta|iota|kappa|lambda|mu|nu|xi|pi|rho|sigma|tau|upsilon|phi|chi|psi|omega)(?!\$)', r'$\\\1$', text)
-            
-            # Case 3: Fix LaTeX in the middle of text: u \cos \theta t to $u \cos \theta$ t
-            text = re.sub(r'([a-zA-Z0-9])\s*\\(cos|sin|tan)\s*([a-zA-Zα-ωΑ-Ω]+)\s*([a-zA-Z0-9])', r'\1 $\\\2 \3$ \4', text)
-            
-            # Case 4: Fix subscript formatting: a_y to $a_y$
-            text = re.sub(r'([a-zA-Z])_([a-zA-Z0-9])', r'$\1_\2$', text)
-            
-            # Case 5: Fix fraction without $: 1/2 to \frac{1}{2} (optional)
-            # text = re.sub(r'(\d+)/(\d+)', r'$\\frac{\1}{\2}$', text)
+            for pattern, replacement in patterns:
+                text = re.sub(pattern, replacement, text)
             
             return text
         
-        # Apply the comprehensive fix
-        display_content = fix_all_latex(display_content)
+        # Apply the fix
+        display_content = fix_broken_latex(display_content)
         
-        # STEP 4: Also fix the specific patterns from your example
-        # Fix: u \cos \theta t (missing $)
-        display_content = re.sub(r'u \\cos \\theta t', r'$u \cos \theta$ t', display_content)
+        # STEP 5: SIMPLE RENDERING - Just use markdown with KaTeX
+        # Split into lines to handle each line separately
+        lines = display_content.split('\n')
         
-        # Fix: u \sin \theta t (missing $)
-        display_content = re.sub(r'u \\sin \\theta t', r'$u \sin \theta$ t', display_content)
-        
-        # Fix: a_y = -g (subscript without $)
-        display_content = re.sub(r'a_y = -g', r'$a_y = -g$', display_content)
-        
-        # STEP 5: SIMPLE RENDERING - Let KaTeX handle it all
-        # Split into paragraphs first
-        paragraphs = display_content.split('\n\n')
-        
-        for paragraph in paragraphs:
-            if not paragraph.strip():
+        for line in lines:
+            if not line.strip():
                 st.write("")  # Empty line
                 continue
             
-            # Check if this paragraph has display math ($$)
-            if '$$' in paragraph:
-                # Split by display math blocks
-                parts = re.split(r'(\$\$.*?\$\$)', paragraph)
-                for part in parts:
-                    if not part:
-                        continue
-                    if part.startswith('$$') and part.endswith('$$'):
-                        st.latex(part[2:-2])  # Display math
-                    else:
-                        st.markdown(part, unsafe_allow_html=False)
+            # Check if this line is mostly LaTeX
+            latex_count = len(re.findall(r'\$', line))
+            if latex_count >= 2:  # Has at least one LaTeX expression
+                st.markdown(line, unsafe_allow_html=False)
             else:
-                # Regular paragraph with inline math
-                st.markdown(paragraph, unsafe_allow_html=False)
+                # No LaTeX or minimal - render as is
+                st.markdown(line, unsafe_allow_html=False)
         
         # STEP 6: Handle Python code blocks
         if code_blocks and role == "assistant":
-            execute_plotting_code(code_blocks[0])
+            if code_blocks:  # Check if not empty
+                execute_plotting_code(code_blocks[0])
             
             with st.expander("📊 Show/Hide Graph Code"):
                 for i, code in enumerate(code_blocks):
@@ -520,18 +500,25 @@ def display_message(role, content, enable_voice=False):
         
         # STEP 7: Handle images
         if image_match and role == "assistant" and image_query:
-            image_result = search_image(image_query)
-            if image_result and "Error" not in image_result:
-                st.image(image_result, caption=f"Diagram: {image_query}")
-                st.markdown(f"[🔗 Open Image in New Tab]({image_result})")
-            else:
-                st.warning(f"⚠️ Image Search Failed: {image_result}")
+            try:
+                image_result = search_image(image_query)
+                if image_result and "Error" not in str(image_result):
+                    st.image(image_result, caption=f"Diagram: {image_query}")
+                    st.markdown(f"[🔗 Open Image in New Tab]({image_result})")
+                else:
+                    st.warning(f"⚠️ Could not find image for: {image_query}")
+            except Exception as e:
+                st.warning(f"⚠️ Image search error: {str(e)[:50]}...")
         
         # STEP 8: Handle voice
         if enable_voice and role == "assistant" and len(display_content.strip()) > 0:
-            audio_bytes = generate_audio(display_content)
-            if audio_bytes:
-                st.audio(audio_bytes, format='audio/mp3')
+            try:
+                audio_bytes = generate_audio(display_content)
+                if audio_bytes:
+                    st.audio(audio_bytes, format='audio/mp3')
+            except Exception as e:
+                st.error(f"Audio error: {str(e)[:50]}...")
+                
 # -----------------------------------------------------------------------------
 # 5. DEEPSEEK API INTEGRATION
 # -----------------------------------------------------------------------------
