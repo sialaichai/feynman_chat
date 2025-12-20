@@ -10,17 +10,33 @@ from duckduckgo_search import DDGS
 import time
 
 # ============================================================
-# 1. PROPER KA-TEX SETUP (THIS IS THE REAL FIX)
+# KA-TEX SETUP - MUST BE AT THE VERY TOP
 # ============================================================
 st.markdown("""
 <!DOCTYPE html>
 <html>
 <head>
+    <!-- KaTeX CSS -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
     <style>
-        .katex { font-size: 1.1em; }
-        .katex-display { margin: 1em 0; }
-        body { font-family: Arial, sans-serif; }
+        /* Force KaTeX to render properly */
+        .katex { 
+            font-size: 1.1em !important; 
+            display: inline !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+        .katex-display { 
+            margin: 1em 0 !important;
+            text-align: center;
+        }
+        /* Fix for common LaTeX issues */
+        .stMarkdown p {
+            line-height: 1.7;
+            margin-bottom: 0.5em;
+        }
+        /* Remove extra line breaks */
+        br { display: none; }
     </style>
 </head>
 <body>
@@ -28,31 +44,51 @@ st.markdown("""
 </html>
 
 <script>
-// Load KaTeX
-function loadScript(src, onload) {
-    var script = document.createElement('script');
-    script.src = src;
-    script.onload = onload;
-    document.head.appendChild(script);
-}
-
-// Load KaTeX and auto-render
-loadScript('https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js', function() {
-    loadScript('https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js', function() {
-        // Wait for Streamlit to render content
-        setTimeout(function() {
-            if (typeof renderMathInElement !== 'undefined') {
+// This is the FIX: Load KaTeX AFTER Streamlit content is ready
+document.addEventListener('DOMContentLoaded', function() {
+    // Load KaTeX dynamically
+    function loadScript(src, callback) {
+        var script = document.createElement('script');
+        script.src = src;
+        script.onload = callback;
+        document.head.appendChild(script);
+    }
+    
+    // Load KaTeX and auto-render
+    loadScript('https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js', function() {
+        loadScript('https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js', function() {
+            // Wait for Streamlit to finish rendering
+            setTimeout(renderAllMath, 1000);
+        });
+    });
+    
+    function renderAllMath() {
+        if (typeof renderMathInElement !== 'undefined') {
+            // Render math in the entire document
+            renderMathInElement(document.body, {
+                delimiters: [
+                    {left: '$$', right: '$$', display: true},
+                    {left: '$', right: '$', display: false},
+                    {left: '\\(', right: '\\)', display: false},
+                    {left: '\\[', right: '\\]', display: true}
+                ],
+                throwOnError: false,
+                strict: false,
+                trust: true
+            });
+            
+            // Also try to render any new elements that appear
+            setInterval(function() {
                 renderMathInElement(document.body, {
                     delimiters: [
                         {left: '$$', right: '$$', display: true},
                         {left: '$', right: '$', display: false}
                     ],
-                    throwOnError: false,
-                    strict: false
+                    throwOnError: false
                 });
-            }
-        }, 500);
-    });
+            }, 2000);
+        }
+    }
 });
 </script>
 """, unsafe_allow_html=True)
