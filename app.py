@@ -8,7 +8,7 @@ import os
 import io
 from gtts import gTTS
 from duckduckgo_search import DDGS
-
+#deepseek#
 # -----------------------------------------------------------------------------
 # 1. PAGE CONFIGURATION
 # -----------------------------------------------------------------------------
