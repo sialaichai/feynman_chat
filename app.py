@@ -117,17 +117,200 @@ st.set_page_config(
 # -----------------------------------------------------------------------------
 @st.cache_data(show_spinner=False)
 def generate_audio(text):
-    """Generates MP3 audio from text, skipping code/image tags."""
-    clean_text = re.sub(r'```.*?```', 'I have generated a graph.', text, flags=re.DOTALL)
-    clean_text = re.sub(r'\[IMAGE:.*?\]', 'Here is a diagram.', clean_text)
+    """Generates MP3 audio from text with proper LaTeX-to-speech conversion."""
+    
+    def clean_for_speech(content):
+        """Clean text for natural speech with full LaTeX support."""
+        # First, extract and preserve code blocks
+        content = re.sub(r'```python.*?```', '[PYTHON_CODE]', content, flags=re.DOTALL)
+        content = re.sub(r'```.*?```', '[CODE_BLOCK]', content, flags=re.DOTALL)
+        
+        # Extract and preserve image tags
+        content = re.sub(r'\[IMAGE:.*?\]', '[IMAGE]', content)
+        
+        # Remove markdown formatting (bold, italics) but keep text
+        content = re.sub(r'\*\*(.*?)\*\*', r'\1', content)
+        content = re.sub(r'\*(.*?)\*', r'\1', content)
+        
+        # Convert ALL LaTeX to speech (both inline $...$ and display $$...$$)
+        latex_expressions = re.findall(r'\$.*?\$', content)
+        for latex_expr in latex_expressions:
+            # Convert LaTeX to speech
+            spoken_form = latex_to_speech(latex_expr)
+            # Replace in content
+            content = content.replace(latex_expr, f' {spoken_form} ')
+        
+        # Also handle display math $$...$$
+        display_math = re.findall(r'\$\$.*?\$\$', content, re.DOTALL)
+        for math_expr in display_math:
+            spoken_form = latex_to_speech(math_expr)
+            content = content.replace(math_expr, f' {spoken_form} ')
+        
+        # Restore placeholders with natural descriptions
+        content = content.replace('[PYTHON_CODE]', 'I generated a graph.')
+        content = content.replace('[CODE_BLOCK]', '')
+        content = content.replace('[IMAGE]', 'Here is a diagram.')
+        
+        # Final cleanup
+        content = re.sub(r'\s+', ' ', content).strip()
+        
+        # Handle common physics abbreviations
+        content = re.sub(r'\bF_([BE])\b', r'F \1', content)
+        content = re.sub(r'\bE_([kpt])\b', r'E \1', content)
+        content = re.sub(r'\bv_([0-9])\b', r'v \1', content)
+        
+        return content
+    
     try:
-        tts = gTTS(text=clean_text, lang='en')
-        audio_fp = io.BytesIO()
-        tts.write_to_fp(audio_fp)
-        audio_fp.seek(0)
-        return audio_fp
-    except:
+        # Clean the text
+        clean_text = clean_for_speech(text)
+        
+        # Generate audio if we have meaningful content
+        if len(clean_text) > 10:  # Avoid very short audio
+            tts = gTTS(text=clean_text, lang='en', slow=False)
+            audio_fp = io.BytesIO()
+            tts.write_to_fp(audio_fp)
+            audio_fp.seek(0)
+            return audio_fp
         return None
+    except Exception as e:
+        print(f"Audio generation error: {e}")
+        return None
+
+def latex_to_speech(text):
+    """
+    Converts LaTeX mathematical expressions to spoken English.
+    Handles fractions, roots, powers, integrals, Greek letters, and common physics notation.
+    """
+    
+    # First, protect text inside \text{} commands
+    def protect_text(match):
+        return f" TEXTSTART {match.group(1)} TEXTEND "
+    
+    text = re.sub(r'\\text\{([^}]+)\}', protect_text, text)
+    
+    # Dictionary of LaTeX to speech mappings
+    replacements = [
+        # Greek letters (common in physics)
+        (r'\\alpha', 'alpha'),
+        (r'\\beta', 'beta'),
+        (r'\\gamma', 'gamma'),
+        (r'\\Gamma', 'capital gamma'),
+        (r'\\delta', 'delta'),
+        (r'\\Delta', 'capital delta'),
+        (r'\\epsilon', 'epsilon'),
+        (r'\\varepsilon', 'epsilon'),
+        (r'\\zeta', 'zeta'),
+        (r'\\eta', 'eta'),
+        (r'\\theta', 'theta'),
+        (r'\\Theta', 'capital theta'),
+        (r'\\vartheta', 'theta'),
+        (r'\\iota', 'iota'),
+        (r'\\kappa', 'kappa'),
+        (r'\\lambda', 'lambda'),
+        (r'\\Lambda', 'capital lambda'),
+        (r'\\mu', 'mu'),
+        (r'\\nu', 'nu'),
+        (r'\\xi', 'xi'),
+        (r'\\Xi', 'capital xi'),
+        (r'\\pi', 'pi'),
+        (r'\\Pi', 'capital pi'),
+        (r'\\rho', 'rho'),
+        (r'\\sigma', 'sigma'),
+        (r'\\Sigma', 'capital sigma'),
+        (r'\\tau', 'tau'),
+        (r'\\phi', 'phi'),
+        (r'\\varphi', 'phi'),
+        (r'\\Phi', 'capital phi'),
+        (r'\\chi', 'chi'),
+        (r'\\psi', 'psi'),
+        (r'\\Psi', 'capital psi'),
+        (r'\\omega', 'omega'),
+        (r'\\Omega', 'capital omega'),
+        
+        # Square roots and roots
+        (r'\\sqrt\{([^}]+)\}', r'square root of \1'),
+        (r'\\sqrt\[(\d+)\]\{([^}]+)\}', r'\1-th root of \2'),
+        
+        # Fractions
+        (r'\\frac\{([^}]+)\}\{([^}]+)\}', r'\1 over \2'),
+        (r'\\dfrac\{([^}]+)\}\{([^}]+)\}', r'\1 over \2'),
+        (r'\\tfrac\{([^}]+)\}\{([^}]+)\}', r'\1 over \2'),
+        
+        # Powers and subscripts
+        (r'([a-zA-Zα-ωΑ-Ω])\^\{([^}]+)\}', r'\1 to the power of \2'),
+        (r'([a-zA-Zα-ωΑ-Ω])\^(\d+)', r'\1 to the power of \2'),
+        (r'([a-zA-Zα-ωΑ-Ω])_\{([^}]+)\}', r'\1 sub \2'),
+        (r'([a-zA-Zα-ωΑ-Ω])_([a-zA-Z0-9])', r'\1 sub \2'),
+        
+        # Common functions
+        (r'\\sin', 'sine'),
+        (r'\\cos', 'cosine'),
+        (r'\\tan', 'tangent'),
+        (r'\\cot', 'cotangent'),
+        (r'\\sec', 'secant'),
+        (r'\\csc', 'cosecant'),
+        (r'\\log', 'log'),
+        (r'\\ln', 'natural log'),
+        (r'\\exp', 'exponential'),
+        
+        # Integrals and derivatives
+        (r'\\int', 'integral'),
+        (r'\\iint', 'double integral'),
+        (r'\\iiint', 'triple integral'),
+        (r'\\oint', 'contour integral'),
+        (r'\\partial', 'partial'),
+        (r'\\nabla', 'nabla'),
+        (r'\\mathrm\{d\}', 'd'),  # for dx, dy, etc
+        
+        # Common physics operators
+        (r'\\vec\{([^}]+)\}', r'\1 vector'),
+        (r'\\hat\{([^}]+)\}', r'\1 hat'),
+        (r'\\overline\{([^}]+)\}', r'average of \1'),
+        (r'\\langle', 'left angle bracket'),
+        (r'\\rangle', 'right angle bracket'),
+        
+        # Limits
+        (r'\\lim_\{([^}]+)\}', r'limit as \1'),
+        (r'\\sum_\{([^}]+)\}', r'sum over \1'),
+        (r'\\prod_\{([^}]+)\}', r'product over \1'),
+        
+        # Brackets and parentheses
+        (r'\\left\(', '('),
+        (r'\\right\)', ')'),
+        (r'\\left\[', '['),
+        (r'\\right\]', ']'),
+        (r'\\left\\{', '{'),
+        (r'\\right\\}', '}'),
+        
+        # Common constants
+        (r'\\hbar', 'h bar'),
+        (r'\\ell', 'script l'),
+        
+        # Remove remaining LaTeX commands (gentle cleanup)
+        (r'\\[a-zA-Z]+', ' '),
+        
+        # Clean up braces
+        (r'\{', ' '),
+        (r'\}', ' '),
+        
+        # Handle special characters
+        (r'\^', ' to the power of '),
+        (r'_', ' sub '),
+        (r'\$', ''),
+        
+        # Restore protected text
+        (r'TEXTSTART ([^T]+) TEXTEND', r'\1'),
+    ]
+    
+    # Apply all replacements
+    for pattern, replacement in replacements:
+        text = re.sub(pattern, replacement, text)
+    
+    # Final cleanup
+    text = re.sub(r'\s+', ' ', text).strip()
+    
+    return text
 
 def google_search_api(query, api_key, cx):
     """Helper: Performs a single Google Search."""
