@@ -9,26 +9,35 @@ from gtts import gTTS
 from duckduckgo_search import DDGS
 import time
 
-# Add CSS for better LaTeX rendering
+# KaTeX for beautiful LaTeX rendering
 st.markdown("""
+<!-- KaTeX CSS -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossorigin="anonymous">
+
+<!-- KaTeX JS -->
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" crossorigin="anonymous"></script>
+
+<!-- Initialize KaTeX -->
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        renderMathInElement(document.body, {
+            delimiters: [
+                {left: '$$', right: '$$', display: true},
+                {left: '$', right: '$', display: false},
+                {left: '\\(', right: '\\)', display: false},
+                {left: '\\[', right: '\\]', display: true}
+            ],
+            throwOnError: false
+        });
+    });
+</script>
+
 <style>
-    /* Make LaTeX larger and clearer */
-    .stLatex {
-        font-size: 1.1em !important;
-        margin: 0.5em 0 !important;
-    }
-    
-    /* Style inline equations */
-    .stLatex:not(.st-emotion-cache-1lvtz7x) {
-        display: inline !important;
-        margin: 0 0.2em !important;
-    }
-    
-    /* Make text more readable */
-    .stMarkdown {
-        font-size: 16px;
-        line-height: 1.6;
-    }
+    /* Custom styling for better LaTeX */
+    .katex { font-size: 1.05em !important; }
+    .katex-display { margin: 1em 0 !important; }
+    p { line-height: 1.6; }
 </style>
 """, unsafe_allow_html=True)
 
