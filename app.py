@@ -304,10 +304,11 @@ SEAB_H2_MASTER_INSTRUCTIONS = """
 
 CORE_PEDAGOGY = """
 **PEDAGOGY (SOCRATIC):**
+* Only provide full solution if student says "I give up".
 * Ask ONE simple question at a time.
 * Use analogies first.
 * Guide the student, don't solve immediately.
-* Only provide full solution if student says "I give up".
+
 """
 
 USER_LEVEL_INSTRUCTIONS = {
