@@ -9,22 +9,42 @@ from gtts import gTTS
 from duckduckgo_search import DDGS
 import time
 
-# KaTeX for beautiful LaTeX rendering
+# KaTeX for beautiful LaTeX rendering (ADD AT THE TOP)
 st.markdown("""
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
-<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
-<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossorigin="anonymous">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" crossorigin="anonymous"></script>
 <script>
     document.addEventListener("DOMContentLoaded", function() {
         renderMathInElement(document.body, {
             delimiters: [
                 {left: '$$', right: '$$', display: true},
-                {left: '$', right: '$', display: false}
+                {left: '$', right: '$', display: false},
+                {left: '\\(', right: '\\)', display: false},
+                {left: '\\[', right: '\\]', display: true}
             ],
-            throwOnError: false
+            throwOnError: false,
+            strict: false  // Be more forgiving with LaTeX errors
         });
     });
 </script>
+
+<style>
+    /* Make equations blend with text */
+    .katex { 
+        font-size: 1.05em !important; 
+        display: inline !important;
+        margin: 0 0.1em !important;
+    }
+    .katex-display { 
+        margin: 0.8em 0 !important; 
+        text-align: center;
+    }
+    p { 
+        line-height: 1.7; 
+        margin-bottom: 0.8em;
+    }
+</style>
 """, unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
@@ -398,87 +418,107 @@ def execute_plotting_code(code_snippet):
 def display_message(role, content, enable_voice=False):
     with st.chat_message(role):
         
-        # STEP 1: Extract Python code blocks FIRST
+        # STEP 1: Extract Python code blocks
         code_blocks = []
         display_content = content
         
-        # Find and remove ALL Python code blocks from the displayed text
         for match in re.finditer(r'```python(.*?)```', content, re.DOTALL):
-            code_blocks.append(match.group(1))  # Save the code
-            # Remove the entire ```python ... ``` block from displayed content
+            code_blocks.append(match.group(1))
             display_content = display_content.replace(match.group(0), "")
         
-        # STEP 2: Extract image tags similarly
+        # STEP 2: Extract image tags
         image_match = re.search(r'\[IMAGE:\s*(.*?)\]', display_content, re.IGNORECASE)
-        image_result = None
         image_query = None
         
         if image_match and role == "assistant":
             image_query = image_match.group(1)
             display_content = display_content.replace(image_match.group(0), "")
         
-        # STEP 3: CONVERT PARENTHESES TO PROPER LATEX
-        # First, convert any ( \vec{E} ) patterns to $\vec{E}$
-        display_content = re.sub(r'\(\\[^)]+\)', lambda m: f'${m.group(0)[1:-1]}$', display_content)
+        # STEP 3: COMPREHENSIVE LATEX FIX - Handle ALL cases
+        def fix_all_latex(text):
+            """Fix all types of LaTeX formatting issues in one pass."""
+            
+            # Case 1: Already correct with $ delimiters - leave them
+            # (No change needed for $u \cos \theta$)
+            
+            # Case 2: Fix raw LaTeX commands without $
+            # Pattern for \command{...} without $ (like \cos\theta, \frac{1}{2})
+            patterns_to_wrap = [
+                (r'\\[a-zA-Z]+\{', r'\\frac{', r'\\sin{', r'\\cos{', 
+                 r'\\tan{', r'\\vec{', r'\\hat{', r'\\overline{'),
+            ]
+            
+            # Convert \frac{1}{2} to $\frac{1}{2}$
+            text = re.sub(r'(?<!\$)\\frac\{([^}]+)\}\{([^}]+)\}(?!\$)', r'$\frac{\1}{\2}$', text)
+            
+            # Convert \cos\theta to $\cos\theta$ (when not already wrapped)
+            text = re.sub(r'(?<!\$)\\(cos|sin|tan|cot|sec|csc)\s*([a-zA-Zα-ωΑ-Ω_0-9]+)(?!\$)', r'$\\\1 \2$', text)
+            
+            # Convert \vec{E} to $\vec{E}$
+            text = re.sub(r'(?<!\$)\\(vec|hat|overline)\{([^}]+)\}(?!\$)', r'$\\\1{\2}$', text)
+            
+            # Convert Greek letters without $: \theta to $\theta$
+            text = re.sub(r'(?<!\$)\\(alpha|beta|gamma|delta|epsilon|zeta|eta|theta|iota|kappa|lambda|mu|nu|xi|pi|rho|sigma|tau|upsilon|phi|chi|psi|omega)(?!\$)', r'$\\\1$', text)
+            
+            # Case 3: Fix LaTeX in the middle of text: u \cos \theta t to $u \cos \theta$ t
+            text = re.sub(r'([a-zA-Z0-9])\s*\\(cos|sin|tan)\s*([a-zA-Zα-ωΑ-Ω]+)\s*([a-zA-Z0-9])', r'\1 $\\\2 \3$ \4', text)
+            
+            # Case 4: Fix subscript formatting: a_y to $a_y$
+            text = re.sub(r'([a-zA-Z])_([a-zA-Z0-9])', r'$\1_\2$', text)
+            
+            # Case 5: Fix fraction without $: 1/2 to \frac{1}{2} (optional)
+            # text = re.sub(r'(\d+)/(\d+)', r'$\\frac{\1}{\2}$', text)
+            
+            return text
         
-        # Also convert simple ( v = E/B ) patterns
-        display_content = re.sub(r'\(([^()]*\\[^()]+[^()]*)\)', lambda m: f'${m.group(1)}$', display_content)
-
-        # STEP 4: SIMPLE FIX - Use markdown for everything
-        # Let KaTeX handle the rendering via the CSS we already added
-        st.markdown(display_content, unsafe_allow_html=False)
-
-        # STEP 4: FIXED - USE MARKDOWN FOR INLINE LATEX
-        #if '$' in display_content:
-        #    # Split by LaTeX expressions (both inline and display)
-        #    parts = re.split(r'(\$\$.*?\$\$|\$.*?\$)', display_content)
-        #    
-        #    # Create a container to render everything together
-        #    render_container = st.container()
-        #    with render_container:
-        #        # Render parts with appropriate methods
-        #        current_line = []
-        #        
-        #        for part in parts:
-        #            if not part:
-        #                continue
-        #            
-        #            if part.startswith('$$') and part.endswith('$$'):
-        #                # Display equation (should be on its own line)
-        #                # First, render any accumulated inline content
-        #                if current_line:
-        #                    st.markdown(''.join(current_line), unsafe_allow_html=False)
-        #                    current_line = []
-        #                st.latex(part[2:-2])  # Remove the $$ delimiters
-        #            
-        #            elif part.startswith('$') and part.endswith('$'):
-        #                # INLINE equation - add to current line WITHOUT breaking
-        #                current_line.append(part)  # Keep the $ delimiters
-        #            
-        #            else:
-        #                # Regular text - add to current line
-        #                current_line.append(part)
-        #        
-        #        # Render any remaining inline content
-        #        if current_line:
-        #            st.markdown(''.join(current_line), unsafe_allow_html=False)
-        #else:
-        #    # No LaTeX, just render normally
-        #    st.markdown(display_content, unsafe_allow_html=False)
+        # Apply the comprehensive fix
+        display_content = fix_all_latex(display_content)
         
-        # STEP 5: Handle Python code blocks - ONLY in expander
+        # STEP 4: Also fix the specific patterns from your example
+        # Fix: u \cos \theta t (missing $)
+        display_content = re.sub(r'u \\cos \\theta t', r'$u \cos \theta$ t', display_content)
+        
+        # Fix: u \sin \theta t (missing $)
+        display_content = re.sub(r'u \\sin \\theta t', r'$u \sin \theta$ t', display_content)
+        
+        # Fix: a_y = -g (subscript without $)
+        display_content = re.sub(r'a_y = -g', r'$a_y = -g$', display_content)
+        
+        # STEP 5: SIMPLE RENDERING - Let KaTeX handle it all
+        # Split into paragraphs first
+        paragraphs = display_content.split('\n\n')
+        
+        for paragraph in paragraphs:
+            if not paragraph.strip():
+                st.write("")  # Empty line
+                continue
+            
+            # Check if this paragraph has display math ($$)
+            if '$$' in paragraph:
+                # Split by display math blocks
+                parts = re.split(r'(\$\$.*?\$\$)', paragraph)
+                for part in parts:
+                    if not part:
+                        continue
+                    if part.startswith('$$') and part.endswith('$$'):
+                        st.latex(part[2:-2])  # Display math
+                    else:
+                        st.markdown(part, unsafe_allow_html=False)
+            else:
+                # Regular paragraph with inline math
+                st.markdown(paragraph, unsafe_allow_html=False)
+        
+        # STEP 6: Handle Python code blocks
         if code_blocks and role == "assistant":
-            # Execute the FIRST code block to generate the graph
             execute_plotting_code(code_blocks[0])
             
-            # Create ONE expander for all code blocks
             with st.expander("📊 Show/Hide Graph Code"):
                 for i, code in enumerate(code_blocks):
                     if len(code_blocks) > 1:
                         st.markdown(f"**Code block {i+1}:**")
                     st.code(code, language='python')
         
-        # STEP 6: Handle image search
+        # STEP 7: Handle images
         if image_match and role == "assistant" and image_query:
             image_result = search_image(image_query)
             if image_result and "Error" not in image_result:
@@ -487,18 +527,11 @@ def display_message(role, content, enable_voice=False):
             else:
                 st.warning(f"⚠️ Image Search Failed: {image_result}")
         
-        # STEP 7: Handle voice
-        #if enable_voice and role == "assistant" and len(display_content.strip()) > 0:
-        #    clean_text = clean_physics_text_for_speech(display_content)
-        #    audio_bytes = generate_audio(clean_text)
-        #    if audio_bytes:
-        #        st.audio(audio_bytes, format='audio/mp3')
-
-        # STEP 7: Handle voice (fixed)
+        # STEP 8: Handle voice
         if enable_voice and role == "assistant" and len(display_content.strip()) > 0:
-            audio_bytes = generate_audio(display_content)  # Use your existing function
+            audio_bytes = generate_audio(display_content)
             if audio_bytes:
-                st.audio(audio_bytes, format='audio/mp3')     
+                st.audio(audio_bytes, format='audio/mp3')
 # -----------------------------------------------------------------------------
 # 5. DEEPSEEK API INTEGRATION
 # -----------------------------------------------------------------------------
