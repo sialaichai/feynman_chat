@@ -1,7 +1,15 @@
 import streamlit as st
 import hashlib
 import time
-
+import requests
+import matplotlib.pyplot as plt
+import numpy as np
+import re
+from PIL import Image
+import os
+import io
+from gtts import gTTS
+from duckduckgo_search import DDGS
 # -----------------------------------------------------------------------------
 # 1. PASSWORD CONFIGURATION & HASHING
 # -----------------------------------------------------------------------------
@@ -88,16 +96,7 @@ def main_app():
     # -------------------------------------------------------------------------
     # YOUR EXISTING APP CODE STARTS HERE
     # -------------------------------------------------------------------------
-  import streamlit as st
-  import requests
-  import matplotlib.pyplot as plt
-  import numpy as np
-  import re
-  from PIL import Image
-  import os
-  import io
-  from gtts import gTTS
-  from duckduckgo_search import DDGS
+  
   #deepseek#
   # -----------------------------------------------------------------------------
   # 1. PAGE CONFIGURATION
