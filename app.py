@@ -9,28 +9,29 @@ from gtts import gTTS
 from duckduckgo_search import DDGS
 import time
 
-# Add LaTeX support via custom CSS
-#st.markdown("""
-#<style>
-#   /* Enable LaTeX rendering in all markdown */
-#    .stMarkdown {
-#        font-size: 16px;
-#    }
-#    .stMarkdown p {
-#        line-height: 1.6;
-#    }
-#</style>
-#""", unsafe_allow_html=True)
-
-# Add KaTeX support for better LaTeX rendering
+# Add CSS for better LaTeX rendering
 st.markdown("""
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossorigin="anonymous">
-<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous"></script>
-<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" crossorigin="anonymous"
-    onload="renderMathInElement(document.body);"></script>
+<style>
+    /* Make LaTeX larger and clearer */
+    .stLatex {
+        font-size: 1.1em !important;
+        margin: 0.5em 0 !important;
+    }
+    
+    /* Style inline equations */
+    .stLatex:not(.st-emotion-cache-1lvtz7x) {
+        display: inline !important;
+        margin: 0 0.2em !important;
+    }
+    
+    /* Make text more readable */
+    .stMarkdown {
+        font-size: 16px;
+        line-height: 1.6;
+    }
+</style>
 """, unsafe_allow_html=True)
 
-        
 # -----------------------------------------------------------------------------
 # 1. PASSWORD AUTHENTICATION (Runs first before anything else)
 # -----------------------------------------------------------------------------
@@ -407,7 +408,6 @@ def display_message(role, content, enable_voice=False):
         display_content = content
         
         # Find and remove ALL Python code blocks from the displayed text
-        # Using finditer to get all matches
         for match in re.finditer(r'```python(.*?)```', content, re.DOTALL):
             code_blocks.append(match.group(1))  # Save the code
             # Remove the entire ```python ... ``` block from displayed content
@@ -422,13 +422,37 @@ def display_message(role, content, enable_voice=False):
             image_query = image_match.group(1)
             display_content = display_content.replace(image_match.group(0), "")
         
-        # STEP 3: Display the cleaned text (without code blocks)
-        st.markdown(display_content)
+        # STEP 3: CONVERT PARENTHESES TO PROPER LATEX AND RENDER
+        # First, convert any ( \vec{E} ) patterns to $\vec{E}$
+        display_content = re.sub(r'\(\\[^)]+\)', lambda m: f'${m.group(0)[1:-1]}$', display_content)
         
-        # STEP 4: Handle Python code blocks - ONLY in expander
+        # Also convert simple ( v = E/B ) patterns
+        display_content = re.sub(r'\(([^()]*\\[^()]+[^()]*)\)', lambda m: f'${m.group(1)}$', display_content)
+        
+        # STEP 4: SPLIT AND RENDER CONTENT WITH LATEX PROPERLY
+        if '$' in display_content:
+            # Split by LaTeX expressions (both inline and display)
+            parts = re.split(r'(\$\$.*?\$\$|\$.*?\$)', display_content)
+            
+            for part in parts:
+                if not part:
+                    continue
+                elif part.startswith('$$') and part.endswith('$$'):
+                    # Display equation (centered)
+                    st.latex(part[2:-2])  # Remove the $$ delimiters
+                elif part.startswith('$') and part.endswith('$'):
+                    # Inline equation
+                    st.latex(part[1:-1])  # Remove the $ delimiters
+                else:
+                    # Regular text - render as markdown
+                    st.markdown(part, unsafe_allow_html=False)
+        else:
+            # No LaTeX, just render normally
+            st.markdown(display_content, unsafe_allow_html=False)
+        
+        # STEP 5: Handle Python code blocks - ONLY in expander
         if code_blocks and role == "assistant":
             # Execute the FIRST code block to generate the graph
-            # (Assuming you want to execute the first one for graphing)
             execute_plotting_code(code_blocks[0])
             
             # Create ONE expander for all code blocks
@@ -447,14 +471,13 @@ def display_message(role, content, enable_voice=False):
             else:
                 st.warning(f"⚠️ Image Search Failed: {image_result}")
         
-        # STEP 6: Handle voice (keep as is)
+        # STEP 6: Handle voice (use the improved cleaner we discussed)
         if enable_voice and role == "assistant" and len(display_content.strip()) > 0:
-            clean_text = re.sub(r'\$.*?\$', 'mathematical expression', display_content)
-            clean_text = re.sub(r'\\[a-zA-Z]+', '', clean_text)
+            clean_text = clean_physics_text_for_speech(display_content)
             audio_bytes = generate_audio(clean_text)
             if audio_bytes:
                 st.audio(audio_bytes, format='audio/mp3')
-
+                
 # -----------------------------------------------------------------------------
 # 5. DEEPSEEK API INTEGRATION
 # -----------------------------------------------------------------------------
@@ -494,20 +517,24 @@ SEAB_H2_MASTER_INSTRUCTIONS = """
 **Identity:** Richard Feynman. Tutor for Singapore H2 Physics (9478).
 
 **FORMATTING RULES - CRITICAL:**
-1. **MATHEMATICAL EXPRESSIONS:**
-   - For **inline equations**, use single dollar signs: `$F = ma$`
-   - For **display equations** (centered, on their own line), use double dollar signs:
-     ```latex
-     $$E = \frac{1}{2}mv^2 + \frac{1}{2}kx^2 = \text{constant}$$
-     ```
-   - **ALWAYS** use proper LaTeX formatting for all mathematical expressions.
+1. **MATHEMATICAL EXPRESSIONS - USE DOLLAR SIGNS:**
+   - For **inline equations**, you MUST use single dollar signs: `$F = ma$` 
+   - For **display equations**, use double dollar signs: `$$E = mc^2$$`
+   - **NEVER** use parentheses like ( \vec{E} ) or ( v = E/B )
+   - **ALWAYS** use proper LaTeX with $ delimiters: `$\vec{E}$` and `$v = \frac{E}{B}$`
 
-2. **Graphing (Python):** If asked to plot/graph, WRITE PYTHON CODE.
+2. **Greek Letters and Vectors:**
+   - Electric field: `$\vec{E}$` NOT ( \vec{E} )
+   - Velocity: `$v = \frac{E}{B}$` NOT ( v = E/B )
+   - Use: `$\alpha$, $\beta$, $\gamma$, $\theta$, $\phi$`
+
+
+3. **Graphing (Python):** If asked to plot/graph, WRITE PYTHON CODE.
     * **Libraries:** Use ONLY `matplotlib.pyplot`, `numpy`, and `scipy`.
     * **CRITICAL RULE:** Use **Vectorized Operations** (e.g., `y = np.sin(x)`) instead of `for` loops.
     * **Format:** Enclose strictly in ` ```python ` blocks.
 
-3. **Diagrams (Web Search):** If you need to show a diagram, YOU MUST USE THE TAG.
+4. **Diagrams (Web Search):** If you need to show a diagram, YOU MUST USE THE TAG.
     * **Syntax:** `[IMAGE: <concise search query>]`
     * Example: "Here is the setup: [IMAGE: rutherford gold foil experiment diagram]"
     * **Rule:** Do NOT use markdown image links. Use `[IMAGE:...]` ONLY.
