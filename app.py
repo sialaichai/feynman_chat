@@ -132,10 +132,11 @@ def display_message(role, content, enable_voice=False):
         # STEP 3: Handle code blocks (for graphs)
         code_match = re.search(r'```python(.*?)```', content, re.DOTALL)
         if code_match and role == "assistant":
-            with st.expander("Show Graph Code"):
-                st.code(code_match.group(1), language='python')
+        #    with st.expander("Show Graph Code"):
+        #       st.code(code_match.group(1), language='python')
+            text_to_display = text_to_display.replace(code_match.group(0), "")
             execute_plotting_code(code_match.group(1))
-        
+               
         # STEP 4: Handle image search tags
         image_match = re.search(r'\[IMAGE:\s*(.*?)\]', content, re.IGNORECASE)
         if image_match and role == "assistant":
