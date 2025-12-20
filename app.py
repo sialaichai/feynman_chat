@@ -10,36 +10,51 @@ from duckduckgo_search import DDGS
 import time
 
 # ============================================================
-# 1. KA-TEX SETUP (MUST BE AT THE VERY TOP)
+# 1. PROPER KA-TEX SETUP (THIS IS THE REAL FIX)
 # ============================================================
 st.markdown("""
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossorigin="anonymous">
-<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous"></script>
-<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" crossorigin="anonymous"></script>
+<!DOCTYPE html>
+<html>
+<head>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <style>
+        .katex { font-size: 1.1em; }
+        .katex-display { margin: 1em 0; }
+        body { font-family: Arial, sans-serif; }
+    </style>
+</head>
+<body>
+</body>
+</html>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Wait a bit for Streamlit to load content
-    setTimeout(function() {
-        renderMathInElement(document.body, {
-            delimiters: [
-                {left: '$$', right: '$$', display: true},
-                {left: '$', right: '$', display: false},
-                {left: '\\(', right: '\\)', display: false},
-                {left: '\\[', right: '\\]', display: true}
-            ],
-            throwOnError: false,
-            strict: 'ignore'
-        });
-    }, 100);
+// Load KaTeX
+function loadScript(src, onload) {
+    var script = document.createElement('script');
+    script.src = src;
+    script.onload = onload;
+    document.head.appendChild(script);
+}
+
+// Load KaTeX and auto-render
+loadScript('https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js', function() {
+    loadScript('https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js', function() {
+        // Wait for Streamlit to render content
+        setTimeout(function() {
+            if (typeof renderMathInElement !== 'undefined') {
+                renderMathInElement(document.body, {
+                    delimiters: [
+                        {left: '$$', right: '$$', display: true},
+                        {left: '$', right: '$', display: false}
+                    ],
+                    throwOnError: false,
+                    strict: false
+                });
+            }
+        }, 500);
+    });
 });
 </script>
-
-<style>
-    .katex { font-size: 1.05em; }
-    .katex-display { margin: 1em 0; text-align: center; }
-    .stMarkdown p { line-height: 1.6; margin-bottom: 0.8em; }
-</style>
 """, unsafe_allow_html=True)
 
 # ============================================================
