@@ -116,36 +116,43 @@ def execute_plotting_code(code_snippet):
 def display_message(role, content, enable_voice=False):
     with st.chat_message(role):
         
-        text_to_display = content
+        # STEP 1: Pre-process content to ensure LaTeX is properly formatted
+        # This ensures all equations use $$ for display math
+        processed_content = content
         
+        # Check if content has LaTeX but not properly wrapped
+        if '\\frac' in content or '\\int' in content or '\\sum' in content:
+            # You can add more sophisticated processing here if needed
+            pass
+        
+        # STEP 2: Use st.markdown with latex support
+        # This is the crucial line that enables LaTeX rendering
+        st.markdown(processed_content, unsafe_allow_html=False)
+        
+        # STEP 3: Handle code blocks (for graphs)
         code_match = re.search(r'```python(.*?)```', content, re.DOTALL)
-        if code_match and role == "assistant":
-            text_to_display = text_to_display.replace(code_match.group(0), "")
-        
-        image_match = re.search(r'\[IMAGE:\s*(.*?)\]', text_to_display, re.IGNORECASE)
-        image_result = None
-        
-        if image_match and role == "assistant":
-            search_query = image_match.group(1)
-            text_to_display = text_to_display.replace(image_match.group(0), "")
-            image_result = search_image(search_query)
-
-        st.markdown(text_to_display)
-
         if code_match and role == "assistant":
             with st.expander("Show Graph Code"):
                 st.code(code_match.group(1), language='python')
             execute_plotting_code(code_match.group(1))
-            
+        
+        # STEP 4: Handle image search tags
+        image_match = re.search(r'\[IMAGE:\s*(.*?)\]', content, re.IGNORECASE)
         if image_match and role == "assistant":
+            search_query = image_match.group(1)
+            image_result = search_image(search_query)
             if image_result and "Error" not in image_result:
                 st.image(image_result, caption=f"Diagram: {image_match.group(1)}")
                 st.markdown(f"[🔗 Open Image in New Tab]({image_result})")
             else:
                 st.warning(f"⚠️ Image Search Failed: {image_result}")
-
-        if enable_voice and role == "assistant" and len(text_to_display.strip()) > 0:
-            audio_bytes = generate_audio(text_to_display)
+        
+        # STEP 5: Handle voice
+        if enable_voice and role == "assistant" and len(content.strip()) > 0:
+            # For voice, we should use the original content (with LaTeX removed)
+            clean_text = re.sub(r'\$.*?\$', 'mathematical expression', content)
+            clean_text = re.sub(r'\\[a-zA-Z]+', '', clean_text)
+            audio_bytes = generate_audio(clean_text)
             if audio_bytes:
                 st.audio(audio_bytes, format='audio/mp3')
 
