@@ -178,22 +178,25 @@ def call_deepseek_api(messages, api_key, model="deepseek-chat"):
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json"
     }
-    
+
     url = "https://api.deepseek.com/chat/completions"
-    
+
     payload = {
         "model": model,
         "messages": messages,
         "temperature": 0.7,
         "max_tokens": 2000,
-        "stream": False
+        "stream": False  # Non-streaming can be slower[citation:3]
     }
-    
+
     try:
-        response = requests.post(url, headers=headers, json=payload, timeout=30)
+        # The key fix: Add a timeout parameter (e.g., 120 seconds)
+        response = requests.post(url, headers=headers, json=payload, timeout=120)
         response.raise_for_status()
         result = response.json()
         return result["choices"][0]["message"]["content"]
+    except requests.exceptions.Timeout:
+        raise Exception("The request timed out. The server is taking too long to respond.")
     except Exception as e:
         raise Exception(f"DeepSeek API Error: {e}")
 
