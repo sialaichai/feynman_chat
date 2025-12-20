@@ -9,6 +9,19 @@ from gtts import gTTS
 from duckduckgo_search import DDGS
 import time
 
+# Add LaTeX support via custom CSS
+st.markdown("""
+<style>
+    /* Enable LaTeX rendering in all markdown */
+    .stMarkdown {
+        font-size: 16px;
+    }
+    .stMarkdown p {
+        line-height: 1.6;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 # -----------------------------------------------------------------------------
 # 1. PASSWORD AUTHENTICATION (Runs first before anything else)
 # -----------------------------------------------------------------------------
