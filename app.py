@@ -10,18 +10,27 @@ from duckduckgo_search import DDGS
 import time
 
 # Add LaTeX support via custom CSS
-st.markdown("""
-<style>
+#st.markdown("""
+#<style>
     /* Enable LaTeX rendering in all markdown */
-    .stMarkdown {
-        font-size: 16px;
-    }
-    .stMarkdown p {
-        line-height: 1.6;
-    }
-</style>
+#    .stMarkdown {
+#        font-size: 16px;
+#    }
+#    .stMarkdown p {
+#        line-height: 1.6;
+#    }
+#</style>
+#""", unsafe_allow_html=True)
+
+# Add KaTeX support for better LaTeX rendering
+st.markdown("""
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossorigin="anonymous">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" crossorigin="anonymous"
+    onload="renderMathInElement(document.body);"></script>
 """, unsafe_allow_html=True)
 
+        
 # -----------------------------------------------------------------------------
 # 1. PASSWORD AUTHENTICATION (Runs first before anything else)
 # -----------------------------------------------------------------------------
