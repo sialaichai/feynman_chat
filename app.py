@@ -11,34 +11,20 @@ import time
 
 # KaTeX for beautiful LaTeX rendering
 st.markdown("""
-<!-- KaTeX CSS -->
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossorigin="anonymous">
-
-<!-- KaTeX JS -->
-<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous"></script>
-<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" crossorigin="anonymous"></script>
-
-<!-- Initialize KaTeX -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
 <script>
     document.addEventListener("DOMContentLoaded", function() {
         renderMathInElement(document.body, {
             delimiters: [
                 {left: '$$', right: '$$', display: true},
-                {left: '$', right: '$', display: false},
-                {left: '\\(', right: '\\)', display: false},
-                {left: '\\[', right: '\\]', display: true}
+                {left: '$', right: '$', display: false}
             ],
             throwOnError: false
         });
     });
 </script>
-
-<style>
-    /* Custom styling for better LaTeX */
-    .katex { font-size: 1.05em !important; }
-    .katex-display { margin: 1em 0 !important; }
-    p { line-height: 1.6; }
-</style>
 """, unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
@@ -412,62 +398,87 @@ def execute_plotting_code(code_snippet):
 def display_message(role, content, enable_voice=False):
     with st.chat_message(role):
         
-        # STEP 1: Extract code blocks
+        # STEP 1: Extract Python code blocks FIRST
         code_blocks = []
         display_content = content
         
+        # Find and remove ALL Python code blocks from the displayed text
         for match in re.finditer(r'```python(.*?)```', content, re.DOTALL):
-            code_blocks.append(match.group(1))
+            code_blocks.append(match.group(1))  # Save the code
+            # Remove the entire ```python ... ``` block from displayed content
             display_content = display_content.replace(match.group(0), "")
         
-        # STEP 2: Extract image tags
+        # STEP 2: Extract image tags similarly
         image_match = re.search(r'\[IMAGE:\s*(.*?)\]', display_content, re.IGNORECASE)
+        image_result = None
         image_query = None
         
         if image_match and role == "assistant":
             image_query = image_match.group(1)
             display_content = display_content.replace(image_match.group(0), "")
         
-        # STEP 3: CRITICAL FIX - Convert parentheses to $ delimiters
-        # Convert ( \vec{E} ) to $\vec{E}$ and similar patterns
-        import re
+        # STEP 3: CONVERT PARENTHESES TO PROPER LATEX
+        # First, convert any ( \vec{E} ) patterns to $\vec{E}$
+        display_content = re.sub(r'\(\\[^)]+\)', lambda m: f'${m.group(0)[1:-1]}$', display_content)
         
-        # Pattern 1: ( \command{...} )
-        display_content = re.sub(
-            r'\(\\[a-zA-Z]+\{[^}]*\}\)', 
-            lambda m: f'${m.group(0)[1:-1]}$', 
-            display_content
-        )
-        
-        # Pattern 2: ( content with LaTeX )
-        display_content = re.sub(
-            r'\(([^)]*\\[^)]*)\)', 
-            lambda m: f'${m.group(1)}$', 
-            display_content
-        )
-        
-        # Pattern 3: Variables like θ, φ, etc. (common in your example)
-        display_content = re.sub(
-            r'([\s\(])([θφαβγδεζηλμνξπρστυχψω])', 
-            lambda m: f'{m.group(1)}$\{m.group(2)}$', 
-            display_content
-        )
-        
-        # STEP 4: SIMPLE RENDERING - Let KaTeX handle everything
-        # Just render the entire content as markdown
+        # Also convert simple ( v = E/B ) patterns
+        display_content = re.sub(r'\(([^()]*\\[^()]+[^()]*)\)', lambda m: f'${m.group(1)}$', display_content)
+
+        # STEP 4: SIMPLE FIX - Use markdown for everything
+        # Let KaTeX handle the rendering via the CSS we already added
         st.markdown(display_content, unsafe_allow_html=False)
+
+        # STEP 4: FIXED - USE MARKDOWN FOR INLINE LATEX
+        #if '$' in display_content:
+        #    # Split by LaTeX expressions (both inline and display)
+        #    parts = re.split(r'(\$\$.*?\$\$|\$.*?\$)', display_content)
+        #    
+        #    # Create a container to render everything together
+        #    render_container = st.container()
+        #    with render_container:
+        #        # Render parts with appropriate methods
+        #        current_line = []
+        #        
+        #        for part in parts:
+        #            if not part:
+        #                continue
+        #            
+        #            if part.startswith('$$') and part.endswith('$$'):
+        #                # Display equation (should be on its own line)
+        #                # First, render any accumulated inline content
+        #                if current_line:
+        #                    st.markdown(''.join(current_line), unsafe_allow_html=False)
+        #                    current_line = []
+        #                st.latex(part[2:-2])  # Remove the $$ delimiters
+        #            
+        #            elif part.startswith('$') and part.endswith('$'):
+        #                # INLINE equation - add to current line WITHOUT breaking
+        #                current_line.append(part)  # Keep the $ delimiters
+        #            
+        #            else:
+        #                # Regular text - add to current line
+        #                current_line.append(part)
+        #        
+        #        # Render any remaining inline content
+        #        if current_line:
+        #            st.markdown(''.join(current_line), unsafe_allow_html=False)
+        #else:
+        #    # No LaTeX, just render normally
+        #    st.markdown(display_content, unsafe_allow_html=False)
         
-        # STEP 5: Handle code blocks
+        # STEP 5: Handle Python code blocks - ONLY in expander
         if code_blocks and role == "assistant":
+            # Execute the FIRST code block to generate the graph
             execute_plotting_code(code_blocks[0])
             
+            # Create ONE expander for all code blocks
             with st.expander("📊 Show/Hide Graph Code"):
                 for i, code in enumerate(code_blocks):
                     if len(code_blocks) > 1:
                         st.markdown(f"**Code block {i+1}:**")
                     st.code(code, language='python')
         
-        # STEP 6: Handle images
+        # STEP 6: Handle image search
         if image_match and role == "assistant" and image_query:
             image_result = search_image(image_query)
             if image_result and "Error" not in image_result:
@@ -477,12 +488,17 @@ def display_message(role, content, enable_voice=False):
                 st.warning(f"⚠️ Image Search Failed: {image_result}")
         
         # STEP 7: Handle voice
+        #if enable_voice and role == "assistant" and len(display_content.strip()) > 0:
+        #    clean_text = clean_physics_text_for_speech(display_content)
+        #    audio_bytes = generate_audio(clean_text)
+        #    if audio_bytes:
+        #        st.audio(audio_bytes, format='audio/mp3')
+
+        # STEP 7: Handle voice (fixed)
         if enable_voice and role == "assistant" and len(display_content.strip()) > 0:
-            clean_text = clean_physics_text_for_speech(display_content)
-            audio_bytes = generate_audio(clean_text)
+            audio_bytes = generate_audio(display_content)  # Use your existing function
             if audio_bytes:
-                st.audio(audio_bytes, format='audio/mp3')
-                
+                st.audio(audio_bytes, format='audio/mp3')     
 # -----------------------------------------------------------------------------
 # 5. DEEPSEEK API INTEGRATION
 # -----------------------------------------------------------------------------
