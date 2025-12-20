@@ -165,57 +165,84 @@ def execute_plotting_code(code_snippet):
 def display_message(role, content, enable_voice=False):
     with st.chat_message(role):
         
-        # Step 1: Extract and remove code blocks
-        display_content = content
+        # Step 1: Extract Python code blocks
         code_blocks = []
+        display_content = content
         
+        # Find and remove Python code blocks
         for match in re.finditer(r'```python(.*?)```', content, re.DOTALL):
             code_blocks.append(match.group(1))
             display_content = display_content.replace(match.group(0), '')
         
-        # Step 2: Extract and remove image tags
-        image_match = re.search(r'\[IMAGE:\s*(.*?)\]', display_content, re.IGNORECASE)
-        image_query = None
+        # Step 2: Extract and process image tags
+        image_matches = list(re.finditer(r'\[IMAGE:\s*(.*?)\]', display_content, re.IGNORECASE))
+        image_queries = []
         
-        if image_match and role == "assistant":
-            image_query = image_match.group(1)
-            display_content = display_content.replace(image_match.group(0), '')
+        if image_matches and role == "assistant":
+            # Remove all image tags from display content
+            for match in reversed(image_matches):  # Reverse to avoid index issues
+                image_query = match.group(1)
+                image_queries.append(image_query)
+                display_content = display_content[:match.start()] + display_content[match.end():]
         
-        # Step 3: CRITICAL - Fix LaTeX delimiters for KaTeX
-        # KaTeX needs \( \) or $$ $$, but DeepSeek gives [ ] 
-        # Convert [ ... ] to $$ ... $$ for display math
-        display_content = re.sub(r'\[\s*(.*?)\s*\]', r'$$\1$$', display_content, flags=re.DOTALL)
+        # Step 3: Fix LaTeX formatting issues
+        # Remove unwanted line breaks in equations (fixes the "t\nt" issue)
+        display_content = re.sub(r'(\$[^$]+)\n([^$]+\$)', r'\1\2', display_content)
         
-        # Also ensure inline math uses $...$ format
-        # Convert ( ... ) to $...$ if it contains LaTeX
-        display_content = re.sub(r'\(([^)]*\\[^)]*)\)', r'$\1$', display_content)
+        # Fix: Wrap common LaTeX patterns without $ in $
+        # 1. Fractions: \frac{1}{2} -> $\frac{1}{2}$
+        fractions = re.findall(r'(?<!\$)\\frac\{[^}]+\}\{[^}]+\}(?!\$)', display_content)
+        for frac in set(fractions):  # Use set to avoid duplicates
+            display_content = display_content.replace(frac, f'${frac}$')
         
-        # Step 4: Clean up newlines in equations
-        display_content = re.sub(r'\$\$(.*?)\$\$', 
-                                lambda m: f'$${m.group(1).replace(chr(10), " ").replace(chr(13), " ")}$$', 
-                                display_content, flags=re.DOTALL)
+        # 2. Trigonometric functions: \sin\theta -> $\sin\theta$
+        trig_patterns = [
+            (r'\\sin\\?theta', r'$\\sin\\theta$'),
+            (r'\\cos\\?theta', r'$\\cos\\theta$'),
+            (r'\\tan\\?theta', r'$\\tan\\theta$'),
+            (r'\\left\\$', r'\\left('),  # Fix broken \left$
+            (r'\\right\\$', r'\\right)'), # Fix broken \right$
+        ]
         
-        # Step 5: SIMPLE RENDERING - KaTeX will handle it
+        for pattern, replacement in trig_patterns:
+            display_content = re.sub(pattern, replacement, display_content)
+        
+        # 3. Variables with subscripts/superscripts: t^2 -> $t^2$, a_y -> $a_y$
+        display_content = re.sub(r'(?<!\$)([a-zA-Z])_([a-zA-Z0-9])(?!\$\w)', r'$\1_\2$', display_content)
+        display_content = re.sub(r'(?<!\$)([a-zA-Z])\^([0-9])(?!\$\w)', r'$\1^{\2}$', display_content)
+        
+        # Step 4: Render the main content
+        # Just use markdown - KaTeX will handle the LaTeX
         st.markdown(display_content, unsafe_allow_html=False)
         
-        # Step 6: Handle code execution
+        # Step 5: Handle Python code blocks
         if code_blocks and role == "assistant" and code_blocks[0].strip():
             execute_plotting_code(code_blocks[0])
             with st.expander("📊 Show/Hide Graph Code"):
                 st.code(code_blocks[0], language='python')
         
-        # Step 7: Handle images
-        if image_match and role == "assistant" and image_query:
-            img_url = search_image(image_query)
-            if img_url and "Error" not in str(img_url):
-                st.image(img_url, caption=f"Diagram: {image_query}")
+        # Step 6: Handle image search and display
+        if image_queries and role == "assistant":
+            for image_query in image_queries:
+                try:
+                    image_result = search_image(image_query)
+                    if image_result and "Error" not in str(image_result):
+                        st.image(image_result, caption=f"Diagram: {image_query}")
+                        st.markdown(f"[🔗 Open Image in New Tab]({image_result})")
+                    else:
+                        st.warning(f"⚠️ Could not find image for: {image_query}")
+                except Exception as e:
+                    st.warning(f"⚠️ Image search error: {str(e)[:50]}...")
         
-        # Step 8: Handle voice
+        # Step 7: Handle voice
         if enable_voice and role == "assistant" and len(display_content.strip()) > 0:
-            audio = generate_audio(display_content)
-            if audio:
-                st.audio(audio, format='audio/mp3')
-
+            try:
+                audio_bytes = generate_audio(display_content)
+                if audio_bytes:
+                    st.audio(audio_bytes, format='audio/mp3')
+            except Exception as e:
+                st.error(f"Audio error: {str(e)[:50]}...")
+            
 # ============================================================
 # 6. DEEPSEEK API
 # ============================================================
@@ -244,14 +271,20 @@ def call_deepseek_api(messages, api_key, model="deepseek-chat"):
 SEAB_H2_MASTER_INSTRUCTIONS = """
 **Identity:** Richard Feynman. Tutor for Singapore H2 Physics (9478).
 
-**CRITICAL FORMATTING RULES FOR MATHEMATICS:**
-1. **ALWAYS use $ for inline equations:** $F = ma$, $v = u + at$
-2. **ALWAYS use $$ for display equations:**
-   $$E = mc^2$$
-   $$y = (u \sin \theta) t - \frac{1}{2} g t^2$$
-3. **NEVER use [ ] brackets for equations**
-4. **NEVER put equations on separate lines**
-5. **Keep equations inline with text**
+**MATHEMATICAL FORMATTING - THIS IS CRITICAL:**
+1. **ALWAYS use $ around EVERY mathematical expression:**
+   - CORRECT: $u \sin\theta$, $\frac{1}{2} g t^2$, $t = \frac{x}{u \cos\theta}$
+   - WRONG: u \sin\theta, \frac{1}{2} g t^2, t = \frac{x}{u \cos\theta}
+   
+2. **NEVER put variables on separate lines:**
+   - WRONG: The vertical position at time 
+     t
+     t is: y = ...
+   - CORRECT: The vertical position at time $t$ is: $y = ...$
+   
+3. **Keep equations simple and on one line:**
+   - Use: $y = x \tan\theta - \frac{g x^2}{2 u^2 \cos^2\theta}$
+   - Not: y = x tanθ - \frac{gx^2}{2u^2cos^2θ}
 
 **Graphing:** Use ```python blocks for plotting code.
 **Diagrams:** Use [IMAGE: query] tags.
