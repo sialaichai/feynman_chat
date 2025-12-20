@@ -3,14 +3,95 @@ import requests
 import matplotlib.pyplot as plt
 import numpy as np
 import re
-from PIL import Image
 import os
 import io
 from gtts import gTTS
 from duckduckgo_search import DDGS
-#deepseek#
+import time
+
 # -----------------------------------------------------------------------------
-# 1. PAGE CONFIGURATION
+# 1. PASSWORD AUTHENTICATION (Runs first before anything else)
+# -----------------------------------------------------------------------------
+def check_login():
+    """Check if user is logged in. Shows login screen if not."""
+    
+    def authenticate():
+        """Check if entered password matches the one in secrets."""
+        entered_password = st.session_state.get("login_password", "")
+        stored_password = st.secrets.get("APP_PASSWORD", "")
+        
+        if entered_password == stored_password:
+            st.session_state["authenticated"] = True
+            st.session_state["login_time"] = time.time()
+            # Clear the password from session state
+            if "login_password" in st.session_state:
+                del st.session_state["login_password"]
+            st.rerun()
+        else:
+            st.session_state["authenticated"] = False
+            st.error("Incorrect password. Please try again.")
+    
+    # Initialize authentication state
+    if "authenticated" not in st.session_state:
+        st.session_state["authenticated"] = False
+    
+    # Check session timeout (optional: 24 hours)
+    if "login_time" in st.session_state:
+        session_duration = time.time() - st.session_state["login_time"]
+        if session_duration > 86400:  # 24 hours in seconds
+            st.session_state["authenticated"] = False
+            if "login_time" in st.session_state:
+                del st.session_state["login_time"]
+            st.warning("Session expired. Please log in again.")
+    
+    # If authenticated, return True
+    if st.session_state["authenticated"]:
+        return True
+    
+    # Show login screen
+    st.set_page_config(page_title="Login - H2 Physics Bot", layout="centered")
+    
+    col1, col2, col3 = st.columns([1, 2, 1])
+    
+    with col2:
+        st.title("🔐 H2 Physics Tutor")
+        st.markdown("**JPJC Physics Feynman Bot - Login Required**")
+        
+        # Check if password is configured
+        if "APP_PASSWORD" not in st.secrets:
+            st.error("⚠️ Password not configured in app settings.")
+            st.info("Please add 'APP_PASSWORD = \"your_password\"' to Streamlit Cloud Secrets.")
+            st.stop()
+        
+        # Login form
+        with st.form("login_form"):
+            password = st.text_input(
+                "Enter access password:", 
+                type="password",
+                key="login_password"
+            )
+            submit = st.form_submit_button("Login", type="primary")
+            
+            if submit:
+                authenticate()
+        
+        st.markdown("---")
+        st.caption("ℹ️ Contact your instructor if you've forgotten the password.")
+        st.caption("Login persists until you close the browser tab.")
+    
+    st.stop()
+    return False
+
+# -----------------------------------------------------------------------------
+# 2. MAIN APPLICATION (Only runs after successful login)
+# -----------------------------------------------------------------------------
+
+# This is the main gate - stop if not authenticated
+if not check_login():
+    st.stop()
+
+# -----------------------------------------------------------------------------
+# 3. PAGE CONFIGURATION (For the main app)
 # -----------------------------------------------------------------------------
 st.set_page_config(
     page_title="H2 Feynman Bot",
@@ -19,7 +100,7 @@ st.set_page_config(
 )
 
 # -----------------------------------------------------------------------------
-# 2. HELPER FUNCTIONS
+# 4. HELPER FUNCTIONS (From your original script)
 # -----------------------------------------------------------------------------
 @st.cache_data(show_spinner=False)
 def generate_audio(text):
@@ -170,7 +251,7 @@ def display_message(role, content, enable_voice=False):
                 st.audio(audio_bytes, format='audio/mp3')
 
 # -----------------------------------------------------------------------------
-# 3. DEEPSEEK API INTEGRATION
+# 5. DEEPSEEK API INTEGRATION
 # -----------------------------------------------------------------------------
 def call_deepseek_api(messages, api_key, model="deepseek-chat"):
     """Call DeepSeek API with conversation history."""
@@ -186,7 +267,7 @@ def call_deepseek_api(messages, api_key, model="deepseek-chat"):
         "messages": messages,
         "temperature": 0.7,
         "max_tokens": 2000,
-        "stream": False  # Non-streaming can be slower[citation:3]
+        "stream": False
     }
 
     try:
@@ -201,7 +282,7 @@ def call_deepseek_api(messages, api_key, model="deepseek-chat"):
         raise Exception(f"DeepSeek API Error: {e}")
 
 # -----------------------------------------------------------------------------
-# 4. SYSTEM INSTRUCTIONS
+# 6. SYSTEM INSTRUCTIONS
 # -----------------------------------------------------------------------------
 
 SEAB_H2_MASTER_INSTRUCTIONS = """
@@ -258,9 +339,21 @@ USER_LEVEL_INSTRUCTIONS = {
 }
 
 # -----------------------------------------------------------------------------
-# 5. MAIN PAGE LAYOUT & SETTINGS
+# 7. MAIN PAGE LAYOUT & SETTINGS
 # -----------------------------------------------------------------------------
 st.title("⚛️ JPJC H2Physics Feynman Bot (DeepSeek)")
+
+# Add logout button to sidebar
+with st.sidebar:
+    if st.button("🚪 Logout", use_container_width=True):
+        # Clear authentication state
+        st.session_state["authenticated"] = False
+        if "login_time" in st.session_state:
+            del st.session_state["login_time"]
+        # Also clear chat history
+        if "messages" in st.session_state:
+            del st.session_state["messages"]
+        st.rerun()
 
 # --- SETTINGS EXPANDER (Topic, Key, Diagnostics) ---
 with st.expander("⚙️ Settings", expanded=False):
@@ -318,7 +411,7 @@ with col_clear:
         st.rerun()
 
 # -----------------------------------------------------------------------------
-# 6. MAIN CHAT LOGIC
+# 8. MAIN CHAT LOGIC
 # -----------------------------------------------------------------------------
 st.caption(f"Topic: **{topic}** | Level: **{user_level}** | Model: **{model_name}**")
 
