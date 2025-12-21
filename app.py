@@ -225,6 +225,7 @@ def display_message(role, content, enable_voice=False):
         display_content = re.sub(r'\\\((.*?)\\\)', r'$\1$', display_content)
         
         # STEP 4: Display the cleaned text (without code blocks)
+        print(f"BEFORE MARKDOWN: {display_content}")
         st.markdown(display_content)
         
         # STEP 5: Handle Python code blocks - ONLY in expander
