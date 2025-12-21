@@ -138,69 +138,25 @@ def execute_plotting_code(code_snippet):
 def display_message(role, content, enable_voice=False):
     with st.chat_message(role):
         
-        # Step 1: Generic LaTeX cleaner for ALL DeepSeek output
-        def clean_deepseek_latex(text):
-            """
-            Generic cleaner for DeepSeek's LaTeX output.
-            Fixes common issues without targeting specific patterns.
-            """
-            # 1. Remove ALL $ symbols first (DeepSeek uses them incorrectly)
-            text = text.replace('$', '')
-            
-            # 2. Fix common LaTeX typos (FIXED: using list of tuples)
-            replacement_patterns = [
-                (r'\\co\s*s', r'\\cos'),        # \co s -> \cos
-                (r'\\s\s*in', r'\\sin'),        # \s in -> \sin
-                (r'\\t\s*an', r'\\tan'),        # \t an -> \tan
-                (r'\\the\s*ta', r'\\theta'),    # \the ta -> \theta
-            ]
-            
-            for pattern, replacement in replacement_patterns:
-                text = re.sub(pattern, replacement, text)
-            
-            # 3. Remove extra whitespace in equations
-            text = re.sub(r'\s+', ' ', text)
-            
-            # 4. Wrap complete equations in $
-            # Look for = followed by LaTeX commands
-            lines = text.split('\n')
-            cleaned_lines = []
-            
-            for line in lines:
-                line = line.strip()
-                if not line:
-                    cleaned_lines.append('')
-                    continue
-                    
-                if '=' in line and ('\\' in line or 'frac' in line):
-                    # This looks like an equation line
-                    parts = line.split('=', 1)  # Split on first = only
-                    if len(parts) == 2:
-                        # Wrap the equation part in $
-                        left_side = parts[0].strip()
-                        right_side = parts[1].strip()
-                        if right_side:
-                            cleaned_lines.append(f'{left_side} = ${right_side}$')
-                        else:
-                            cleaned_lines.append(line)
-                    else:
-                        cleaned_lines.append(line)
-                else:
-                    cleaned_lines.append(line)
-            
-            return '\n'.join(cleaned_lines)
+        # Step 1: Convert DeepSeek's LaTeX to Streamlit format
+        # DeepSeek uses: \[ equation \] and \( equation \)
+        # Streamlit needs: $$ equation $$ and $ equation $
+        display_content = content
         
-        # Clean the content
-        display_content = clean_deepseek_latex(content)
+        # Convert \[ ... \] to $$ ... $$ (display math)
+        display_content = re.sub(r'\\\[(.*?)\\\]', r'$$\1$$', display_content, flags=re.DOTALL)
         
-        # Step 2: Extract code blocks (after cleaning)
+        # Convert \( ... \) to $ ... $ (inline math)
+        display_content = re.sub(r'\\\((.*?)\\\)', r'$\1$', display_content)
+        
+        # Step 2: Extract and remove code blocks
         code_match = re.search(r'```python(.*?)```', display_content, re.DOTALL)
         code_content = None
         if code_match:
             code_content = code_match.group(1)
             display_content = display_content.replace(code_match.group(0), '')
         
-        # Step 3: Extract image tags
+        # Step 3: Extract and remove image tags
         image_matches = list(re.finditer(r'\[IMAGE:\s*(.*?)\]', display_content, re.IGNORECASE))
         image_queries = []
         if image_matches and role == "assistant":
@@ -208,42 +164,9 @@ def display_message(role, content, enable_voice=False):
                 image_queries.append(match.group(1))
                 display_content = display_content[:match.start()] + display_content[match.end():]
         
-        # Step 4: RENDER CLEANED CONTENT
-        # Process line by line
-        lines = display_content.split('\n')
-        
-        for line in lines:
-            line = line.strip()
-            if not line:
-                st.write("")  # Empty line
-                continue
-            
-            # Check what type of content this is
-            if '$' in line:
-                # Already has $ - render as markdown
-                st.markdown(line)
-            elif '=' in line and ('\\' in line or 'frac' in line):
-                # Equation without $ - try to render it
-                # First, try st.latex() for the equation part
-                try:
-                    # Extract just the equation
-                    if '=' in line:
-                        parts = line.split('=', 1)
-                        if len(parts) == 2:
-                            eq_text = parts[1].strip()
-                            # Try to render with st.latex()
-                            st.markdown(f'{parts[0].strip()} = ')
-                            st.latex(eq_text)
-                        else:
-                            st.markdown(line)
-                    else:
-                        st.markdown(line)
-                except:
-                    # If st.latex fails, fall back to markdown
-                    st.markdown(line)
-            else:
-                # Plain text
-                st.markdown(line)
+        # Step 4: SIMPLE RENDERING
+        # Just render the content as markdown - Streamlit will handle the LaTeX
+        st.markdown(display_content)
         
         # Step 5: Handle code execution
         if code_match and role == "assistant" and code_content and code_content.strip():
@@ -298,24 +221,25 @@ def call_deepseek_api(messages, api_key, model="deepseek-chat"):
 SEAB_H2_MASTER_INSTRUCTIONS = """
 **Identity:** Richard Feynman. Tutor for Singapore H2 Physics (9478).
 
-**MATHEMATICAL FORMATTING - THIS IS CRITICAL:**
-1. **Write equations in plain LaTeX WITHOUT $ symbols:**
-   - Write: y = x \tan\theta - \frac{g x^{2}}{2 u^{2} \cos^{2}\theta}
-   - NOT: $y = x $\tan$\theta$$ - $\frac{g $x^{2}${2 $u^{2}$ \co$s^{2}$\theta}$$
+1. **For displayed equations (centered, on own line), use:** \[ equation \]
+   Example: \[ F = ma \], \[ E = mc^2 \]
 
-2. **Use correct LaTeX commands:**
-   - \cos NOT \co s
-   - \theta NOT \the ta
-   - \tan NOT \t an
+2. **For inline equations (within text), use:** \( equation \)
+   Example: The acceleration due to gravity is \( g = 9.81 \text{ m/s}^2 \).
 
-3. **Keep equations on one line.**
+3. **Use standard LaTeX commands inside these:**
+   - Fractions: \frac{numerator}{denominator}
+   - Greek letters: \alpha, \beta, \gamma, \theta, \phi
+   - Trigonometric: \sin, \cos, \tan
+   
+4. **Keep equations on one line.**
 
-4.  **Graphing (Python):** If asked to plot/graph, WRITE PYTHON CODE.
+5.  **Graphing (Python):** If asked to plot/graph, WRITE PYTHON CODE.
     * **Libraries:** Use ONLY `matplotlib.pyplot`, `numpy`, and `scipy`.
     * **CRITICAL RULE:** Use **Vectorized Operations** (e.g., `y = np.sin(x)`) instead of `for` loops.
     * **Format:** Enclose strictly in ` ```python ` blocks.
 
-5.  **Diagrams (Web Search):** If you need to show a diagram, YOU MUST USE THE TAG.
+6.  **Diagrams (Web Search):** If you need to show a diagram, YOU MUST USE THE TAG.
     * **Syntax:** `[IMAGE: <concise search query>]`
     * Example: "Here is the setup: [IMAGE: rutherford gold foil experiment diagram]"
     * **Rule:** Do NOT use markdown image links. Use `[IMAGE:...]` ONLY.
