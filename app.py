@@ -196,6 +196,39 @@ def execute_plotting_code(code_snippet):
 # ============================================================
 # 5. FIXED DISPLAY_MESSAGE FUNCTION
 # ============================================================
+def fix_deepseek_latex_inconsistency(text):
+    """
+    Fix DeepSeek's inconsistent LaTeX formatting in one pass.
+    Handles: missing $, mixed formats, Greek letters, etc.
+    """
+    # 1. First, ensure all display math \[ \] becomes $$ $$
+    text = re.sub(r'\\\[(.*?)\\\]', r'$$\1$$', text, flags=re.DOTALL)
+    
+    # 2. Ensure all inline math \( \) becomes $ $
+    text = re.sub(r'\\\((.*?)\\\)', r'$\1$', text)
+    
+    # 3. Find and wrap equations that have = and \ but no $
+    # Pattern: word= \frac or word= \lambda, etc.
+    patterns_to_wrap = [
+        # Equations with \frac without $
+        (r'([a-zA-Zα-ωΑ-Ω_]+)\s*=\s*(\\frac\{[^}]+\}\{[^}]+\})', r'$\1 = \2$'),
+        # Equations with \lambda, \theta, etc. without $
+        (r'([a-zA-Zα-ωΑ-Ω_]+)\s*=\s*(\\[a-zA-Z]+)', r'$\1 = \2$'),
+        # Plain Greek letters in equations (λ, θ, φ without \)
+        (r'([λθφ])\s*_\{([^}]+)\}\s*=\s*(\\[^ ]+)', r'$\1_{\2} = \3$'),
+    ]
+    
+    for pattern, replacement in patterns_to_wrap:
+        text = re.sub(pattern, replacement, text)
+    
+    # 4. Ensure any remaining \frac{}{} without $ gets wrapped
+    if '\\frac' in text and not re.search(r'\$.*\\frac.*\$', text):
+        # Find the \frac and some context around it
+        text = re.sub(r'([^$]*)(\\frac\{[^}]+\}\{[^}]+\})([^$]*)', 
+                     r'\1$\2$\3', text)
+    
+    return text
+
 def display_message(role, content, enable_voice=False):
     with st.chat_message(role):
         
@@ -220,16 +253,19 @@ def display_message(role, content, enable_voice=False):
         
         # STEP 3: ✅ ONLY FIX ADDED: Convert DeepSeek's LaTeX to Streamlit format
         # Convert \[ ... \] to $$ ... $$ (display math)
-        display_content = re.sub(r'\\\[(.*?)\\\]', r'$$\1$$', display_content, flags=re.DOTALL)
-        # Convert \( ... \) to $ ... $ (inline math)
-        display_content = re.sub(r'\\\((.*?)\\\)', r'$\1$', display_content)
-        # ADD THIS: Wrap standalone equations without $ 
-        if '=' in display_content and '\\' in display_content and not '$' in display_content:
-            # This finds patterns like: λ_{min} = \frac{hc}{eV}
-            # And wraps them: $λ_{min} = \frac{hc}{eV}$
-            display_content = re.sub(r'([a-zA-Zα-ωΑ-Ω_]+\s*=\s*\\[^ ]+.*?)(?=\s|$|\.|,)', r'$\1$', display_content)
+        #display_content = re.sub(r'\\\[(.*?)\\\]', r'$$\1$$', display_content, flags=re.DOTALL)
+        ## Convert \( ... \) to $ ... $ (inline math)
+        #display_content = re.sub(r'\\\((.*?)\\\)', r'$\1$', display_content)
+        ## ADD THIS: Wrap standalone equations without $ 
+        #if '=' in display_content and '\\' in display_content and not '$' in display_content:
+        #    # This finds patterns like: λ_{min} = \frac{hc}{eV}
+        #    # And wraps them: $λ_{min} = \frac{hc}{eV}$
+        #    display_content = re.sub(r'([a-zA-Zα-ωΑ-Ω_]+\s*=\s*\\[^ ]+.*?)(?=\s|$|\.|,)', r'$\1$', display_content)
         
-        # STEP 4: Display the cleaned text (without code blocks)
+        # STEP 3: Fix DeepSeek's inconsistent LaTeX
+        display_content = fix_deepseek_latex_inconsistency(display_content)
+        
+# STEP 4: Display the cleaned text (without code blocks)
         print(f"BEFORE MARKDOWN: {display_content}")
         st.markdown(display_content)
         
