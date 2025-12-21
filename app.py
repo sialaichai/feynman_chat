@@ -138,43 +138,56 @@ def execute_plotting_code(code_snippet):
 def display_message(role, content, enable_voice=False):
     with st.chat_message(role):
         
-        # Step 1: Convert DeepSeek's LaTeX to Streamlit format
-        # DeepSeek uses: \[ equation \] and \( equation \)
-        # Streamlit needs: $$ equation $$ and $ equation $
+        # Step 1: Convert LaTeX format FIRST
         display_content = content
         
-        # Convert \[ ... \] to $$ ... $$ (display math)
+        # Convert DeepSeek's \[ \] to $$ for display math
         display_content = re.sub(r'\\\[(.*?)\\\]', r'$$\1$$', display_content, flags=re.DOTALL)
-        
-        # Convert \( ... \) to $ ... $ (inline math)
+        # Convert \( \) to $ for inline math
         display_content = re.sub(r'\\\((.*?)\\\)', r'$\1$', display_content)
         
-        # Step 2: Extract and remove code blocks
+        # Step 2: Extract but DON'T remove code blocks yet
         code_match = re.search(r'```python(.*?)```', display_content, re.DOTALL)
         code_content = None
         if code_match:
             code_content = code_match.group(1)
-            display_content = display_content.replace(code_match.group(0), '')
+            # IMPORTANT: Don't remove from display_content yet
+            # We'll handle it separately
         
-        # Step 3: Extract and remove image tags
+        # Step 3: Extract but DON'T remove image tags yet  
         image_matches = list(re.finditer(r'\[IMAGE:\s*(.*?)\]', display_content, re.IGNORECASE))
         image_queries = []
         if image_matches and role == "assistant":
-            for match in reversed(image_matches):
+            for match in image_matches:
                 image_queries.append(match.group(1))
-                display_content = display_content[:match.start()] + display_content[match.end():]
         
-        # Step 4: SIMPLE RENDERING
-        # Just render the content as markdown - Streamlit will handle the LaTeX
-        st.markdown(display_content)
+        # Step 4: Check if we have ANY text content
+        # Create a temporary version without code/images to check
+        temp_content = display_content
+        if code_match:
+            temp_content = temp_content.replace(code_match.group(0), '')
+        for match in image_matches:
+            temp_content = temp_content.replace(match.group(0), '')
         
-        # Step 5: Handle code execution
+        # Step 5: CRITICAL - Display content if it exists
+        temp_content = temp_content.strip()
+        
+        if temp_content:  # Only render if there's actual text
+            st.markdown(display_content)  # Render the full content with code/image tags
+        elif code_content or image_queries:
+            # If only code/images, show a message
+            st.markdown("Showing code or diagram...")
+        else:
+            # If completely empty, show placeholder
+            st.markdown("*(Empty response)*")
+        
+        # Step 6: Handle code execution (AFTER rendering text)
         if code_match and role == "assistant" and code_content and code_content.strip():
             execute_plotting_code(code_content)
             with st.expander("📊 Show/Hide Graph Code"):
                 st.code(code_content, language='python')
         
-        # Step 6: Handle images
+        # Step 7: Handle images (AFTER rendering text)
         if image_queries and role == "assistant":
             for query in image_queries:
                 try:
@@ -184,7 +197,7 @@ def display_message(role, content, enable_voice=False):
                 except:
                     pass
         
-        # Step 7: Handle voice
+        # Step 8: Handle voice
         if enable_voice and role == "assistant" and len(display_content.strip()) > 0:
             try:
                 audio = generate_audio(display_content)
