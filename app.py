@@ -146,56 +146,58 @@ def display_message(role, content, enable_voice=False):
         # Convert \( \) to $ for inline math
         display_content = re.sub(r'\\\((.*?)\\\)', r'$\1$', display_content)
         
-        # Step 2: Extract but DON'T remove code blocks yet
+        # Step 2: Extract code blocks
         code_match = re.search(r'```python(.*?)```', display_content, re.DOTALL)
         code_content = None
         if code_match:
             code_content = code_match.group(1)
-            # IMPORTANT: Don't remove from display_content yet
-            # We'll handle it separately
         
-        # Step 3: Extract but DON'T remove image tags yet  
+        # Step 3: Extract image tags  
         image_matches = list(re.finditer(r'\[IMAGE:\s*(.*?)\]', display_content, re.IGNORECASE))
         image_queries = []
         if image_matches and role == "assistant":
             for match in image_matches:
                 image_queries.append(match.group(1))
         
-        # Step 4: Check if we have ANY text content
-        # Create a temporary version without code/images to check
-        temp_content = display_content
-        if code_match:
-            temp_content = temp_content.replace(code_match.group(0), '')
+        # Step 4: Create text-only version (without images/code)
+        text_content = display_content
+        
+        # Remove image tags for text display
         for match in image_matches:
-            temp_content = temp_content.replace(match.group(0), '')
+            text_content = text_content.replace(match.group(0), '')
         
-        # Step 5: CRITICAL - Display content if it exists
-        temp_content = temp_content.strip()
+        # Remove code blocks for text display
+        if code_match:
+            text_content = text_content.replace(code_match.group(0), '')
         
-        if temp_content:  # Only render if there's actual text
-            st.markdown(display_content)  # Render the full content with code/image tags
-        elif code_content or image_queries:
-            # If only code/images, show a message
-            st.markdown("Showing code or diagram...")
-        else:
-            # If completely empty, show placeholder
-            st.markdown("*(Empty response)*")
+        # Step 5: Display text content if it exists
+        text_content = text_content.strip()
+        if text_content:
+            st.markdown(text_content)
         
-        # Step 6: Handle code execution (AFTER rendering text)
+        # Step 6: Handle images - FIXED VERSION
+        if image_queries and role == "assistant":
+            for query in image_queries:
+                try:
+                    # Search for the image
+                    img_url = search_image(query)
+                    
+                    # Display if we got a valid URL
+                    if img_url and "Error" not in str(img_url) and img_url != "No image found.":
+                        st.image(img_url, caption=f"Diagram: {query}")
+                        st.markdown(f"[🔗 Open Image in New Tab]({img_url})")
+                    else:
+                        # If search failed, just show what we were looking for
+                        st.info(f"📷 Image: {query}")
+                        
+                except Exception as e:
+                    st.warning(f"Image search issue: {str(e)[:50]}")
+        
+        # Step 7: Handle code execution
         if code_match and role == "assistant" and code_content and code_content.strip():
             execute_plotting_code(code_content)
             with st.expander("📊 Show/Hide Graph Code"):
                 st.code(code_content, language='python')
-        
-        # Step 7: Handle images (AFTER rendering text)
-        if image_queries and role == "assistant":
-            for query in image_queries:
-                try:
-                    img_url = search_image(query)
-                    if img_url and "Error" not in str(img_url):
-                        st.image(img_url, caption=f"Diagram: {query}")
-                except:
-                    pass
         
         # Step 8: Handle voice
         if enable_voice and role == "assistant" and len(display_content.strip()) > 0:
@@ -233,6 +235,12 @@ def call_deepseek_api(messages, api_key, model="deepseek-chat"):
 # ============================================================
 SEAB_H2_MASTER_INSTRUCTIONS = """
 **Identity:** Richard Feynman. Tutor for Singapore H2 Physics (9478).
+
+**IMPORTANT FOR IMAGES:**
+- When showing a diagram, ALWAYS include descriptive text BEFORE the [IMAGE: ...] tag
+- Example: "Here's a diagram showing helical motion: [IMAGE: charged particle helical motion in magnetic field 3d diagram]"
+- NEVER respond with ONLY an [IMAGE: ...] tag
+
 
 **MATHEMATICAL FORMATTING:**
 1. **For displayed equations (centered, on own line), use:** \[ equation \]
