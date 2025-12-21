@@ -151,55 +151,39 @@ def display_message(role, content, enable_voice=False):
         code_content = None
         if code_match:
             code_content = code_match.group(1)
+            # Remove code block from display content
+            display_content = display_content.replace(code_match.group(0), '')
         
-        # Step 3: Extract image tags  
-        image_matches = list(re.finditer(r'\[IMAGE:\s*(.*?)\]', display_content, re.IGNORECASE))
-        image_queries = []
-        if image_matches and role == "assistant":
-            for match in image_matches:
-                image_queries.append(match.group(1))
+        # Step 3: Extract image tag - USE YOUR ORIGINAL APPROACH
+        image_match = re.search(r'\[IMAGE:\s*(.*?)\]', display_content, re.IGNORECASE)
+        image_result = None
+        image_query = None
         
-        # Step 4: Create text-only version (without images/code)
-        text_content = display_content
+        if image_match and role == "assistant":
+            image_query = image_match.group(1)
+            # Remove image tag from display content
+            display_content = display_content.replace(image_match.group(0), '')
         
-        # Remove image tags for text display
-        for match in image_matches:
-            text_content = text_content.replace(match.group(0), '')
+        # Step 4: Display the cleaned text content
+        if display_content.strip():
+            st.markdown(display_content.strip())
         
-        # Remove code blocks for text display
-        if code_match:
-            text_content = text_content.replace(code_match.group(0), '')
-        
-        # Step 5: Display text content if it exists
-        text_content = text_content.strip()
-        if text_content:
-            st.markdown(text_content)
-        
-        # Step 6: Handle images - FIXED VERSION
-        if image_queries and role == "assistant":
-            for query in image_queries:
-                try:
-                    # Search for the image
-                    img_url = search_image(query)
-                    
-                    # Display if we got a valid URL
-                    if img_url and "Error" not in str(img_url) and img_url != "No image found.":
-                        st.image(img_url, caption=f"Diagram: {query}")
-                        st.markdown(f"[🔗 Open Image in New Tab]({img_url})")
-                    else:
-                        # If search failed, just show what we were looking for
-                        st.info(f"📷 Image: {query}")
-                        
-                except Exception as e:
-                    st.warning(f"Image search issue: {str(e)[:50]}")
-        
-        # Step 7: Handle code execution
+        # Step 5: Handle code execution
         if code_match and role == "assistant" and code_content and code_content.strip():
             execute_plotting_code(code_content)
             with st.expander("📊 Show/Hide Graph Code"):
                 st.code(code_content, language='python')
         
-        # Step 8: Handle voice
+        # Step 6: Handle image search - USE YOUR ORIGINAL CODE
+        if image_match and role == "assistant" and image_query:
+            image_result = search_image(image_query)
+            if image_result and "Error" not in image_result:
+                st.image(image_result, caption=f"Diagram: {image_query}")
+                st.markdown(f"[🔗 Open Image in New Tab]({image_result})")
+            else:
+                st.warning(f"⚠️ Image Search Failed: {image_result}")
+        
+        # Step 7: Handle voice
         if enable_voice and role == "assistant" and len(display_content.strip()) > 0:
             try:
                 audio = generate_audio(display_content)
