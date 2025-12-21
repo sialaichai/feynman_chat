@@ -144,18 +144,18 @@ def display_message(role, content, enable_voice=False):
             Generic cleaner for DeepSeek's LaTeX output.
             Fixes common issues without targeting specific patterns.
             """
-            # 1. Remove ALL $ symbols first
+            # 1. Remove ALL $ symbols first (DeepSeek uses them incorrectly)
             text = text.replace('$', '')
             
-            # 2. Fix common LaTeX typos
-            replacements = {
-                r'\\co\s*s': r'\\cos',        # \co s -> \cos
-                r'\\s\s*in': r'\\sin',        # \s in -> \sin
-                r'\\t\s*an': r'\\tan',        # \t an -> \tan
-                r'\\the\s*ta': r'\\theta',    # \the ta -> \theta
-            }
+            # 2. Fix common LaTeX typos (FIXED: using list of tuples)
+            replacement_patterns = [
+                (r'\\co\s*s', r'\\cos'),        # \co s -> \cos
+                (r'\\s\s*in', r'\\sin'),        # \s in -> \sin
+                (r'\\t\s*an', r'\\tan'),        # \t an -> \tan
+                (r'\\the\s*ta', r'\\theta'),    # \the ta -> \theta
+            ]
             
-            for pattern, replacement in replacements:
+            for pattern, replacement in replacement_patterns:
                 text = re.sub(pattern, replacement, text)
             
             # 3. Remove extra whitespace in equations
@@ -167,14 +167,19 @@ def display_message(role, content, enable_voice=False):
             cleaned_lines = []
             
             for line in lines:
+                line = line.strip()
+                if not line:
+                    cleaned_lines.append('')
+                    continue
+                    
                 if '=' in line and ('\\' in line or 'frac' in line):
                     # This looks like an equation line
-                    parts = line.split('=')
+                    parts = line.split('=', 1)  # Split on first = only
                     if len(parts) == 2:
                         # Wrap the equation part in $
                         left_side = parts[0].strip()
                         right_side = parts[1].strip()
-                        if right_side and not right_side.startswith('$'):
+                        if right_side:
                             cleaned_lines.append(f'{left_side} = ${right_side}$')
                         else:
                             cleaned_lines.append(line)
@@ -190,8 +195,9 @@ def display_message(role, content, enable_voice=False):
         
         # Step 2: Extract code blocks (after cleaning)
         code_match = re.search(r'```python(.*?)```', display_content, re.DOTALL)
-        code_content = code_match.group(1) if code_match else None
+        code_content = None
         if code_match:
+            code_content = code_match.group(1)
             display_content = display_content.replace(code_match.group(0), '')
         
         # Step 3: Extract image tags
@@ -202,25 +208,38 @@ def display_message(role, content, enable_voice=False):
                 image_queries.append(match.group(1))
                 display_content = display_content[:match.start()] + display_content[match.end():]
         
-        # Step 4: SIMPLE RENDERING
+        # Step 4: RENDER CLEANED CONTENT
         # Process line by line
         lines = display_content.split('\n')
         
         for line in lines:
             line = line.strip()
             if not line:
+                st.write("")  # Empty line
                 continue
             
-            # Check if line contains LaTeX to render
+            # Check what type of content this is
             if '$' in line:
-                # Has LaTeX - render as markdown
+                # Already has $ - render as markdown
                 st.markdown(line)
             elif '=' in line and ('\\' in line or 'frac' in line):
-                # Equation without $ - add $ and render
-                parts = line.split('=')
-                if len(parts) == 2:
-                    st.markdown(f'{parts[0].strip()} = ${parts[1].strip()}$')
-                else:
+                # Equation without $ - try to render it
+                # First, try st.latex() for the equation part
+                try:
+                    # Extract just the equation
+                    if '=' in line:
+                        parts = line.split('=', 1)
+                        if len(parts) == 2:
+                            eq_text = parts[1].strip()
+                            # Try to render with st.latex()
+                            st.markdown(f'{parts[0].strip()} = ')
+                            st.latex(eq_text)
+                        else:
+                            st.markdown(line)
+                    else:
+                        st.markdown(line)
+                except:
+                    # If st.latex fails, fall back to markdown
                     st.markdown(line)
             else:
                 # Plain text
@@ -237,16 +256,19 @@ def display_message(role, content, enable_voice=False):
             for query in image_queries:
                 try:
                     img_url = search_image(query)
-                    if img_url:
+                    if img_url and "Error" not in str(img_url):
                         st.image(img_url, caption=f"Diagram: {query}")
                 except:
                     pass
         
         # Step 7: Handle voice
         if enable_voice and role == "assistant" and len(display_content.strip()) > 0:
-            audio = generate_audio(display_content)
-            if audio:
-                st.audio(audio, format='audio/mp3')
+            try:
+                audio = generate_audio(display_content)
+                if audio:
+                    st.audio(audio, format='audio/mp3')
+            except:
+                pass
                 
 # ============================================================
 # 6. DEEPSEEK API
