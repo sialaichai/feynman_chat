@@ -252,7 +252,7 @@ def display_message(role, content, enable_voice=False):
             display_content = display_content.replace(image_match.group(0), "")
         
         # STEP 3: ✅ ONLY FIX ADDED: Convert DeepSeek's LaTeX to Streamlit format
-        Convert \[ ... \] to $$ ... $$ (display math)
+        # Convert \[ ... \] to $$ ... $$ (display math)
         display_content = re.sub(r'\\\[(.*?)\\\]', r'$$\1$$', display_content, flags=re.DOTALL)
         # Convert \( ... \) to $ ... $ (inline math)
         display_content = re.sub(r'\\\((.*?)\\\)', r'$\1$', display_content)
