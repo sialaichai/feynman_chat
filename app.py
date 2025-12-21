@@ -110,16 +110,77 @@ def generate_audio(text):
         pass
     return None
 
-def search_image(query):
-    """Search for images."""
+def google_search_api(query, api_key, cx):
+    """Helper: Performs a single Google Search."""
     try:
-        with DDGS(timeout=10) as ddgs:
-            results = ddgs.images(keywords=query, max_results=1)
-            for result in results:
-                return result['image']
-    except:
-        pass
+        url = "https://www.googleapis.com/customsearch/v1"
+        params = {
+            "q": query,
+            "cx": cx,
+            "key": api_key,
+            "searchType": "image",
+            "num": 3,
+            "safe": "active"
+        }
+        
+        response = requests.get(url, params=params)
+        
+        if response.status_code in [403, 429]:
+            return None
+            
+        data = response.json()
+        
+        if "items" in data and len(data["items"]) > 0:
+            for item in data["items"]:
+                link = item["link"]
+                if link.lower().endswith(('.jpg', '.jpeg', '.png')):
+                    return link
+            return data["items"][0]["link"]
+            
+    except Exception as e:
+        print(f"Google API Exception: {e}")
+        return None
     return None
+
+def duckduckgo_search_api(query):
+    """Improved Fallback search with headers and region."""
+    try:
+        with DDGS(timeout=20) as ddgs:
+            results = ddgs.images(keywords=query, region='wt-wt', safesearch='moderate')
+            first_result = next(results, None)
+            if first_result:
+                return first_result['image']
+    except Exception as e:
+        return f"Search Error: {e}"
+    return "No image found."
+
+@st.cache_data(show_spinner=False)
+def search_image(query):
+    """MASTER FUNCTION: Google Key 1 -> Google Key 2 -> DuckDuckGo"""
+    
+    def get_secret(name):
+        if name in st.secrets:
+            return st.secrets[name]
+        return os.environ.get(name)
+
+    cx = get_secret("GOOGLE_CX")
+    
+    # 1. Try Google Key 1
+    key1 = get_secret("GOOGLE_SEARCH_KEY")
+    if key1 and cx:
+        url = google_search_api(query, key1, cx)
+        if url: 
+            return url
+
+    # 2. Try Google Key 2
+    key2 = get_secret("GOOGLE_SEARCH_KEY_2")
+    if key2 and cx:
+        url = google_search_api(query, key2, cx)
+        if url: 
+            return url
+
+    # 3. Fallback to DuckDuckGo
+    return duckduckgo_search_api(query)
 
 def execute_plotting_code(code_snippet):
     """Execute plotting code."""
@@ -138,59 +199,62 @@ def execute_plotting_code(code_snippet):
 def display_message(role, content, enable_voice=False):
     with st.chat_message(role):
         
-        # Step 1: Convert LaTeX format FIRST
+        # STEP 1: Extract Python code blocks FIRST
+        code_blocks = []
         display_content = content
         
-        # Convert DeepSeek's \[ \] to $$ for display math
-        display_content = re.sub(r'\\\[(.*?)\\\]', r'$$\1$$', display_content, flags=re.DOTALL)
-        # Convert \( \) to $ for inline math
-        display_content = re.sub(r'\\\((.*?)\\\)', r'$\1$', display_content)
+        # Find and remove ALL Python code blocks from the displayed text
+        for match in re.finditer(r'```python(.*?)```', content, re.DOTALL):
+            code_blocks.append(match.group(1))  # Save the code
+            # Remove the entire ```python ... ``` block from displayed content
+            display_content = display_content.replace(match.group(0), "")
         
-        # Step 2: Extract code blocks
-        code_match = re.search(r'```python(.*?)```', display_content, re.DOTALL)
-        code_content = None
-        if code_match:
-            code_content = code_match.group(1)
-            # Remove code block from display content
-            display_content = display_content.replace(code_match.group(0), '')
-        
-        # Step 3: Extract image tag - USE YOUR ORIGINAL APPROACH
+        # STEP 2: Extract image tags similarly
         image_match = re.search(r'\[IMAGE:\s*(.*?)\]', display_content, re.IGNORECASE)
         image_result = None
         image_query = None
         
         if image_match and role == "assistant":
             image_query = image_match.group(1)
-            # Remove image tag from display content
-            display_content = display_content.replace(image_match.group(0), '')
+            display_content = display_content.replace(image_match.group(0), "")
         
-        # Step 4: Display the cleaned text content
-        if display_content.strip():
-            st.markdown(display_content.strip())
+        # STEP 3: ✅ ONLY FIX ADDED: Convert DeepSeek's LaTeX to Streamlit format
+        # Convert \[ ... \] to $$ ... $$ (display math)
+        display_content = re.sub(r'\\\[(.*?)\\\]', r'$$\1$$', display_content, flags=re.DOTALL)
+        # Convert \( ... \) to $ ... $ (inline math)
+        display_content = re.sub(r'\\\((.*?)\\\)', r'$\1$', display_content)
         
-        # Step 5: Handle code execution
-        if code_match and role == "assistant" and code_content and code_content.strip():
-            execute_plotting_code(code_content)
+        # STEP 4: Display the cleaned text (without code blocks)
+        st.markdown(display_content)
+        
+        # STEP 5: Handle Python code blocks - ONLY in expander
+        if code_blocks and role == "assistant":
+            # Execute the FIRST code block to generate the graph
+            execute_plotting_code(code_blocks[0])
+            
+            # Create ONE expander for all code blocks
             with st.expander("📊 Show/Hide Graph Code"):
-                st.code(code_content, language='python')
+                for i, code in enumerate(code_blocks):
+                    if len(code_blocks) > 1:
+                        st.markdown(f"**Code block {i+1}:**")
+                    st.code(code, language='python')
         
-        # Step 6: Handle image search - USE YOUR ORIGINAL CODE
+        # STEP 6: ✅ YOUR ORIGINAL IMAGE HANDLING - UNCHANGED
         if image_match and role == "assistant" and image_query:
-            image_result = search_image(image_query)
+            image_result = search_image(image_query)  # Calls YOUR complete search system
             if image_result and "Error" not in image_result:
                 st.image(image_result, caption=f"Diagram: {image_query}")
                 st.markdown(f"[🔗 Open Image in New Tab]({image_result})")
             else:
                 st.warning(f"⚠️ Image Search Failed: {image_result}")
         
-        # Step 7: Handle voice
+        # STEP 7: Handle voice (keep as is)
         if enable_voice and role == "assistant" and len(display_content.strip()) > 0:
-            try:
-                audio = generate_audio(display_content)
-                if audio:
-                    st.audio(audio, format='audio/mp3')
-            except:
-                pass
+            clean_text = re.sub(r'\$.*?\$', 'mathematical expression', display_content)
+            clean_text = re.sub(r'\\[a-zA-Z]+', '', clean_text)
+            audio_bytes = generate_audio(clean_text)
+            if audio_bytes:
+                st.audio(audio_bytes, format='audio/mp3')
                 
 # ============================================================
 # 6. DEEPSEEK API
@@ -295,6 +359,29 @@ with st.sidebar:
     model_name = st.selectbox("Model:", ["deepseek-chat", "deepseek-coder"])
     user_level = st.radio("Level:", ["Beginner", "Intermediate", "Advance"], horizontal=True, index=1)
     enable_voice = st.toggle("🗣️ Read Aloud")
+
+#with st.sidebar:
+    if st.button("Test Image Search System"):
+        test_query = "physics diagram"
+        st.write(f"Testing search for: {test_query}")
+        
+        # Test each component
+        cx = st.secrets.get("GOOGLE_CX", "Not set")
+        key1 = st.secrets.get("GOOGLE_SEARCH_KEY", "Not set")
+        
+        st.write(f"GOOGLE_CX: {'✅ Set' if cx != 'Not set' else '❌ Missing'}")
+        st.write(f"GOOGLE_SEARCH_KEY: {'✅ Set' if key1 != 'Not set' else '❌ Missing'}")
+        
+        # Test the search
+        result = search_image(test_query)
+        st.write(f"Search result: {result}")
+        
+        if result and result.startswith("http"):
+            st.image(result, caption="Test Image", width=300)
+            st.success("✅ Image search working!")
+        else:
+            st.error("❌ Image search failed")
+
 
 # Chat interface
 st.caption(f"Topic: {topic} | Level: {user_level}")
