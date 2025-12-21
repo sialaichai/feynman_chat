@@ -138,17 +138,63 @@ def execute_plotting_code(code_snippet):
 def display_message(role, content, enable_voice=False):
     with st.chat_message(role):
         
-        # Step 1: Extract code blocks and image tags
-        display_content = content
+        # Step 1: Generic LaTeX cleaner for ALL DeepSeek output
+        def clean_deepseek_latex(text):
+            """
+            Generic cleaner for DeepSeek's LaTeX output.
+            Fixes common issues without targeting specific patterns.
+            """
+            # 1. Remove ALL $ symbols first
+            text = text.replace('$', '')
+            
+            # 2. Fix common LaTeX typos
+            replacements = {
+                r'\\co\s*s': r'\\cos',        # \co s -> \cos
+                r'\\s\s*in': r'\\sin',        # \s in -> \sin
+                r'\\t\s*an': r'\\tan',        # \t an -> \tan
+                r'\\the\s*ta': r'\\theta',    # \the ta -> \theta
+            }
+            
+            for pattern, replacement in replacements:
+                text = re.sub(pattern, replacement, text)
+            
+            # 3. Remove extra whitespace in equations
+            text = re.sub(r'\s+', ' ', text)
+            
+            # 4. Wrap complete equations in $
+            # Look for = followed by LaTeX commands
+            lines = text.split('\n')
+            cleaned_lines = []
+            
+            for line in lines:
+                if '=' in line and ('\\' in line or 'frac' in line):
+                    # This looks like an equation line
+                    parts = line.split('=')
+                    if len(parts) == 2:
+                        # Wrap the equation part in $
+                        left_side = parts[0].strip()
+                        right_side = parts[1].strip()
+                        if right_side and not right_side.startswith('$'):
+                            cleaned_lines.append(f'{left_side} = ${right_side}$')
+                        else:
+                            cleaned_lines.append(line)
+                    else:
+                        cleaned_lines.append(line)
+                else:
+                    cleaned_lines.append(line)
+            
+            return '\n'.join(cleaned_lines)
         
-        # Extract Python code
+        # Clean the content
+        display_content = clean_deepseek_latex(content)
+        
+        # Step 2: Extract code blocks (after cleaning)
         code_match = re.search(r'```python(.*?)```', display_content, re.DOTALL)
-        code_content = None
+        code_content = code_match.group(1) if code_match else None
         if code_match:
-            code_content = code_match.group(1)
             display_content = display_content.replace(code_match.group(0), '')
         
-        # Extract image tags
+        # Step 3: Extract image tags
         image_matches = list(re.finditer(r'\[IMAGE:\s*(.*?)\]', display_content, re.IGNORECASE))
         image_queries = []
         if image_matches and role == "assistant":
@@ -156,89 +202,52 @@ def display_message(role, content, enable_voice=False):
                 image_queries.append(match.group(1))
                 display_content = display_content[:match.start()] + display_content[match.end():]
         
-        # Step 2: FIX DEEPSEEK'S BROKEN FORMATTING
-        # This is the key fix for your specific problem
+        # Step 4: SIMPLE RENDERING
+        # Process line by line
+        lines = display_content.split('\n')
         
-        # Fix 1: Remove line breaks in variable names (t\nt -> t)
-        display_content = re.sub(r'(\b[a-zA-Zθφ])\s*\n\s*\1\b', r'\1', display_content)
-        
-        # Fix 2: Remove line breaks around equals signs (y\n=\nx -> y = x)
-        display_content = re.sub(r'(\b[a-zA-Z])\s*\n\s*=\s*\n\s*([a-zA-Z])', r'\1 = \2', display_content)
-        
-        # Fix 3: Fix the \co\n\cos issue
-        display_content = re.sub(r'\\co\s*\n\s*\\cos', r'\\cos', display_content)
-        
-        # Fix 4: Ensure ALL LaTeX math has $ delimiters
-        # Find patterns like \tan\theta, \frac{1}{2}, etc. without $
-        latex_patterns = [
-            (r'(?<!\$)\\frac\{([^}]+)\}\{([^}]+)\}(?!\$\w)', r'$\\frac{\1}{\2}$'),
-            (r'(?<!\$)\\(tan|sin|cos)\\?theta(?!\$\w)', r'$\\\1\\theta$'),
-            (r'(?<!\$)([a-zA-Z])\^\{?([0-9]+)\}?(?!\$\w)', r'$\1^{\2}$'),
-            (r'(?<!\$)\\theta(?!\$\w)', r'$\\theta$'),
-        ]
-        
-        for pattern, replacement in latex_patterns:
-            display_content = re.sub(pattern, replacement, display_content)
-        
-        # Fix 5: Fix equations that start with variable= but no $
-        # Pattern: y=x\tan\theta (no space, no $)
-        display_content = re.sub(
-            r'(\b[a-zA-Z])=([^$\s].*?\\[^$]+)(?=\s|$|\.|,)',
-            r'\1 = $\2$',
-            display_content
-        )
-        
-        # Step 3: RENDER THE CONTENT PROPERLY
-        # Split into paragraphs to handle different content types
-        paragraphs = display_content.split('\n\n')
-        
-        for para in paragraphs:
-            if not para.strip():
+        for line in lines:
+            line = line.strip()
+            if not line:
                 continue
-                
-            # Check if this is mostly an equation
-            lines = para.strip().split('\n')
             
-            if len(lines) == 1 and '=' in para and ('\\' in para or '$' in para):
-                # Single line equation - render with st.latex()
-                eq_text = para.strip()
-                # Remove $ delimiters for st.latex()
-                if eq_text.startswith('$') and eq_text.endswith('$'):
-                    eq_text = eq_text[1:-1]
-                try:
-                    st.latex(eq_text)
-                except:
-                    st.markdown(f'${eq_text}$')
+            # Check if line contains LaTeX to render
+            if '$' in line:
+                # Has LaTeX - render as markdown
+                st.markdown(line)
+            elif '=' in line and ('\\' in line or 'frac' in line):
+                # Equation without $ - add $ and render
+                parts = line.split('=')
+                if len(parts) == 2:
+                    st.markdown(f'{parts[0].strip()} = ${parts[1].strip()}$')
+                else:
+                    st.markdown(line)
             else:
-                # Multi-line or text content - render as markdown
-                for line in lines:
-                    if line.strip():
-                        st.markdown(line.strip())
+                # Plain text
+                st.markdown(line)
         
-        # Step 4: Handle code execution
+        # Step 5: Handle code execution
         if code_match and role == "assistant" and code_content and code_content.strip():
             execute_plotting_code(code_content)
             with st.expander("📊 Show/Hide Graph Code"):
                 st.code(code_content, language='python')
         
-        # Step 5: Handle images
+        # Step 6: Handle images
         if image_queries and role == "assistant":
             for query in image_queries:
                 try:
                     img_url = search_image(query)
-                    if img_url and "Error" not in str(img_url):
+                    if img_url:
                         st.image(img_url, caption=f"Diagram: {query}")
-                    else:
-                        st.warning(f"Image not found: {query}")
                 except:
-                    st.warning(f"Image search failed for: {query}")
+                    pass
         
-        # Step 6: Handle voice
+        # Step 7: Handle voice
         if enable_voice and role == "assistant" and len(display_content.strip()) > 0:
             audio = generate_audio(display_content)
             if audio:
                 st.audio(audio, format='audio/mp3')
-            
+                
 # ============================================================
 # 6. DEEPSEEK API
 # ============================================================
@@ -268,19 +277,16 @@ SEAB_H2_MASTER_INSTRUCTIONS = """
 **Identity:** Richard Feynman. Tutor for Singapore H2 Physics (9478).
 
 **MATHEMATICAL FORMATTING - THIS IS CRITICAL:**
-1. **ALWAYS use $ around EVERY mathematical expression:**
-   - CORRECT: $u \sin\theta$, $\frac{1}{2} g t^2$, $t = \frac{x}{u \cos\theta}$
-   - WRONG: u \sin\theta, \frac{1}{2} g t^2, t = \frac{x}{u \cos\theta}
-   
-2. **NEVER put variables on separate lines:**
-   - WRONG: The vertical position at time 
-     t
-     t is: y = ...
-   - CORRECT: The vertical position at time $t$ is: $y = ...$
-   
-3. **Keep equations simple and on one line:**
-   - Use: $y = x \tan\theta - \frac{g x^2}{2 u^2 \cos^2\theta}$
-   - Not: y = x tanθ - \frac{gx^2}{2u^2cos^2θ}
+1. **Write equations in plain LaTeX WITHOUT $ symbols:**
+   - Write: y = x \tan\theta - \frac{g x^{2}}{2 u^{2} \cos^{2}\theta}
+   - NOT: $y = x $\tan$\theta$$ - $\frac{g $x^{2}${2 $u^{2}$ \co$s^{2}$\theta}$$
+
+2. **Use correct LaTeX commands:**
+   - \cos NOT \co s
+   - \theta NOT \the ta
+   - \tan NOT \t an
+
+3. **Keep equations on one line.**
 
 4.  **Graphing (Python):** If asked to plot/graph, WRITE PYTHON CODE.
     * **Libraries:** Use ONLY `matplotlib.pyplot`, `numpy`, and `scipy`.
