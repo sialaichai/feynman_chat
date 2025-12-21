@@ -252,18 +252,18 @@ def display_message(role, content, enable_voice=False):
             display_content = display_content.replace(image_match.group(0), "")
         
         # STEP 3: ✅ ONLY FIX ADDED: Convert DeepSeek's LaTeX to Streamlit format
-        # Convert \[ ... \] to $$ ... $$ (display math)
-        #display_content = re.sub(r'\\\[(.*?)\\\]', r'$$\1$$', display_content, flags=re.DOTALL)
-        ## Convert \( ... \) to $ ... $ (inline math)
-        #display_content = re.sub(r'\\\((.*?)\\\)', r'$\1$', display_content)
-        ## ADD THIS: Wrap standalone equations without $ 
-        #if '=' in display_content and '\\' in display_content and not '$' in display_content:
-        #    # This finds patterns like: λ_{min} = \frac{hc}{eV}
-        #    # And wraps them: $λ_{min} = \frac{hc}{eV}$
-        #    display_content = re.sub(r'([a-zA-Zα-ωΑ-Ω_]+\s*=\s*\\[^ ]+.*?)(?=\s|$|\.|,)', r'$\1$', display_content)
+        Convert \[ ... \] to $$ ... $$ (display math)
+        display_content = re.sub(r'\\\[(.*?)\\\]', r'$$\1$$', display_content, flags=re.DOTALL)
+        # Convert \( ... \) to $ ... $ (inline math)
+        display_content = re.sub(r'\\\((.*?)\\\)', r'$\1$', display_content)
+        # ADD THIS: Wrap standalone equations without $ 
+        if '=' in display_content and '\\' in display_content and not '$' in display_content:
+            # This finds patterns like: λ_{min} = \frac{hc}{eV}
+            # And wraps them: $λ_{min} = \frac{hc}{eV}$
+            display_content = re.sub(r'([a-zA-Zα-ωΑ-Ω_]+\s*=\s*\\[^ ]+.*?)(?=\s|$|\.|,)', r'$\1$', display_content)
         
         # STEP 3: Fix DeepSeek's inconsistent LaTeX
-        display_content = fix_deepseek_latex_inconsistency(display_content)
+        #display_content = fix_deepseek_latex_inconsistency(display_content)
         
 # STEP 4: Display the cleaned text (without code blocks)
         print(f"BEFORE MARKDOWN: {display_content}")
