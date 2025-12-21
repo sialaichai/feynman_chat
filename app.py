@@ -9,88 +9,25 @@ from gtts import gTTS
 from duckduckgo_search import DDGS
 import time
 
-# ============================================================
-# KA-TEX SETUP - MUST BE AT THE VERY TOP
-# ============================================================
+# Add this after imports
 st.markdown("""
-<!DOCTYPE html>
-<html>
-<head>
-    <!-- KaTeX CSS -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
-    <style>
-        /* Force KaTeX to render properly */
-        .katex { 
-            font-size: 1.1em !important; 
-            display: inline !important;
-            margin: 0 !important;
-            padding: 0 !important;
-        }
-        .katex-display { 
-            margin: 1em 0 !important;
-            text-align: center;
-        }
-        /* Fix for common LaTeX issues */
-        .stMarkdown p {
-            line-height: 1.7;
-            margin-bottom: 0.5em;
-        }
-        /* Remove extra line breaks */
-        br { display: none; }
-    </style>
-</head>
-<body>
-</body>
-</html>
-
-<script>
-// This is the FIX: Load KaTeX AFTER Streamlit content is ready
-document.addEventListener('DOMContentLoaded', function() {
-    // Load KaTeX dynamically
-    function loadScript(src, callback) {
-        var script = document.createElement('script');
-        script.src = src;
-        script.onload = callback;
-        document.head.appendChild(script);
+<style>
+    /* Make equations look better */
+    .stLatex {
+        font-size: 1.1em;
+        margin: 10px 0;
+        padding: 10px;
+        background-color: #f8f9fa;
+        border-radius: 5px;
+        border-left: 4px solid #4CAF50;
     }
     
-    // Load KaTeX and auto-render
-    loadScript('https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js', function() {
-        loadScript('https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js', function() {
-            // Wait for Streamlit to finish rendering
-            setTimeout(renderAllMath, 1000);
-        });
-    });
-    
-    function renderAllMath() {
-        if (typeof renderMathInElement !== 'undefined') {
-            // Render math in the entire document
-            renderMathInElement(document.body, {
-                delimiters: [
-                    {left: '$$', right: '$$', display: true},
-                    {left: '$', right: '$', display: false},
-                    {left: '\\(', right: '\\)', display: false},
-                    {left: '\\[', right: '\\]', display: true}
-                ],
-                throwOnError: false,
-                strict: false,
-                trust: true
-            });
-            
-            // Also try to render any new elements that appear
-            setInterval(function() {
-                renderMathInElement(document.body, {
-                    delimiters: [
-                        {left: '$$', right: '$$', display: true},
-                        {left: '$', right: '$', display: false}
-                    ],
-                    throwOnError: false
-                });
-            }, 2000);
-        }
+    /* Improve text readability */
+    .stMarkdown {
+        font-size: 16px;
+        line-height: 1.6;
     }
-});
-</script>
+</style>
 """, unsafe_allow_html=True)
 
 # ============================================================
@@ -201,83 +138,106 @@ def execute_plotting_code(code_snippet):
 def display_message(role, content, enable_voice=False):
     with st.chat_message(role):
         
-        # Step 1: Extract Python code blocks
-        code_blocks = []
+        # Step 1: Extract code blocks and image tags
         display_content = content
         
-        # Find and remove Python code blocks
-        for match in re.finditer(r'```python(.*?)```', content, re.DOTALL):
-            code_blocks.append(match.group(1))
-            display_content = display_content.replace(match.group(0), '')
+        # Extract Python code
+        code_match = re.search(r'```python(.*?)```', display_content, re.DOTALL)
+        code_content = None
+        if code_match:
+            code_content = code_match.group(1)
+            display_content = display_content.replace(code_match.group(0), '')
         
-        # Step 2: Extract and process image tags
+        # Extract image tags
         image_matches = list(re.finditer(r'\[IMAGE:\s*(.*?)\]', display_content, re.IGNORECASE))
         image_queries = []
-        
         if image_matches and role == "assistant":
-            # Remove all image tags from display content
-            for match in reversed(image_matches):  # Reverse to avoid index issues
-                image_query = match.group(1)
-                image_queries.append(image_query)
+            for match in reversed(image_matches):
+                image_queries.append(match.group(1))
                 display_content = display_content[:match.start()] + display_content[match.end():]
         
-        # Step 3: Fix LaTeX formatting issues
-        # Remove unwanted line breaks in equations (fixes the "t\nt" issue)
-        display_content = re.sub(r'(\$[^$]+)\n([^$]+\$)', r'\1\2', display_content)
+        # Step 2: FIX DEEPSEEK'S BROKEN FORMATTING
+        # This is the key fix for your specific problem
         
-        # Fix: Wrap common LaTeX patterns without $ in $
-        # 1. Fractions: \frac{1}{2} -> $\frac{1}{2}$
-        fractions = re.findall(r'(?<!\$)\\frac\{[^}]+\}\{[^}]+\}(?!\$)', display_content)
-        for frac in set(fractions):  # Use set to avoid duplicates
-            display_content = display_content.replace(frac, f'${frac}$')
+        # Fix 1: Remove line breaks in variable names (t\nt -> t)
+        display_content = re.sub(r'(\b[a-zA-Zθφ])\s*\n\s*\1\b', r'\1', display_content)
         
-        # 2. Trigonometric functions: \sin\theta -> $\sin\theta$
-        trig_patterns = [
-            (r'\\sin\\?theta', r'$\\sin\\theta$'),
-            (r'\\cos\\?theta', r'$\\cos\\theta$'),
-            (r'\\tan\\?theta', r'$\\tan\\theta$'),
-            (r'\\left\\$', r'\\left('),  # Fix broken \left$
-            (r'\\right\\$', r'\\right)'), # Fix broken \right$
+        # Fix 2: Remove line breaks around equals signs (y\n=\nx -> y = x)
+        display_content = re.sub(r'(\b[a-zA-Z])\s*\n\s*=\s*\n\s*([a-zA-Z])', r'\1 = \2', display_content)
+        
+        # Fix 3: Fix the \co\n\cos issue
+        display_content = re.sub(r'\\co\s*\n\s*\\cos', r'\\cos', display_content)
+        
+        # Fix 4: Ensure ALL LaTeX math has $ delimiters
+        # Find patterns like \tan\theta, \frac{1}{2}, etc. without $
+        latex_patterns = [
+            (r'(?<!\$)\\frac\{([^}]+)\}\{([^}]+)\}(?!\$\w)', r'$\\frac{\1}{\2}$'),
+            (r'(?<!\$)\\(tan|sin|cos)\\?theta(?!\$\w)', r'$\\\1\\theta$'),
+            (r'(?<!\$)([a-zA-Z])\^\{?([0-9]+)\}?(?!\$\w)', r'$\1^{\2}$'),
+            (r'(?<!\$)\\theta(?!\$\w)', r'$\\theta$'),
         ]
         
-        for pattern, replacement in trig_patterns:
+        for pattern, replacement in latex_patterns:
             display_content = re.sub(pattern, replacement, display_content)
         
-        # 3. Variables with subscripts/superscripts: t^2 -> $t^2$, a_y -> $a_y$
-        display_content = re.sub(r'(?<!\$)([a-zA-Z])_([a-zA-Z0-9])(?!\$\w)', r'$\1_\2$', display_content)
-        display_content = re.sub(r'(?<!\$)([a-zA-Z])\^([0-9])(?!\$\w)', r'$\1^{\2}$', display_content)
+        # Fix 5: Fix equations that start with variable= but no $
+        # Pattern: y=x\tan\theta (no space, no $)
+        display_content = re.sub(
+            r'(\b[a-zA-Z])=([^$\s].*?\\[^$]+)(?=\s|$|\.|,)',
+            r'\1 = $\2$',
+            display_content
+        )
         
-        # Step 4: Render the main content
-        # Just use markdown - KaTeX will handle the LaTeX
-        st.markdown(display_content, unsafe_allow_html=False)
+        # Step 3: RENDER THE CONTENT PROPERLY
+        # Split into paragraphs to handle different content types
+        paragraphs = display_content.split('\n\n')
         
-        # Step 5: Handle Python code blocks
-        if code_blocks and role == "assistant" and code_blocks[0].strip():
-            execute_plotting_code(code_blocks[0])
-            with st.expander("📊 Show/Hide Graph Code"):
-                st.code(code_blocks[0], language='python')
-        
-        # Step 6: Handle image search and display
-        if image_queries and role == "assistant":
-            for image_query in image_queries:
+        for para in paragraphs:
+            if not para.strip():
+                continue
+                
+            # Check if this is mostly an equation
+            lines = para.strip().split('\n')
+            
+            if len(lines) == 1 and '=' in para and ('\\' in para or '$' in para):
+                # Single line equation - render with st.latex()
+                eq_text = para.strip()
+                # Remove $ delimiters for st.latex()
+                if eq_text.startswith('$') and eq_text.endswith('$'):
+                    eq_text = eq_text[1:-1]
                 try:
-                    image_result = search_image(image_query)
-                    if image_result and "Error" not in str(image_result):
-                        st.image(image_result, caption=f"Diagram: {image_query}")
-                        st.markdown(f"[🔗 Open Image in New Tab]({image_result})")
-                    else:
-                        st.warning(f"⚠️ Could not find image for: {image_query}")
-                except Exception as e:
-                    st.warning(f"⚠️ Image search error: {str(e)[:50]}...")
+                    st.latex(eq_text)
+                except:
+                    st.markdown(f'${eq_text}$')
+            else:
+                # Multi-line or text content - render as markdown
+                for line in lines:
+                    if line.strip():
+                        st.markdown(line.strip())
         
-        # Step 7: Handle voice
+        # Step 4: Handle code execution
+        if code_match and role == "assistant" and code_content and code_content.strip():
+            execute_plotting_code(code_content)
+            with st.expander("📊 Show/Hide Graph Code"):
+                st.code(code_content, language='python')
+        
+        # Step 5: Handle images
+        if image_queries and role == "assistant":
+            for query in image_queries:
+                try:
+                    img_url = search_image(query)
+                    if img_url and "Error" not in str(img_url):
+                        st.image(img_url, caption=f"Diagram: {query}")
+                    else:
+                        st.warning(f"Image not found: {query}")
+                except:
+                    st.warning(f"Image search failed for: {query}")
+        
+        # Step 6: Handle voice
         if enable_voice and role == "assistant" and len(display_content.strip()) > 0:
-            try:
-                audio_bytes = generate_audio(display_content)
-                if audio_bytes:
-                    st.audio(audio_bytes, format='audio/mp3')
-            except Exception as e:
-                st.error(f"Audio error: {str(e)[:50]}...")
+            audio = generate_audio(display_content)
+            if audio:
+                st.audio(audio, format='audio/mp3')
             
 # ============================================================
 # 6. DEEPSEEK API
