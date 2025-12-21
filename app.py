@@ -292,7 +292,7 @@ def display_message(role, content, enable_voice=False):
         
         # STEP 7: Handle voice (keep as is)
         if enable_voice and role == "assistant" and len(display_content.strip()) > 0:
-            clean_text = re.sub(r'\$.*?\$', 'mathematical expression', display_content)
+            clean_text = re.sub(r'\$.*?\$', 'mathematical expression', content)  # ← CHANGE: content NOT display_content
             clean_text = re.sub(r'\\[a-zA-Z]+', '', clean_text)
             audio_bytes = generate_audio(clean_text)
             if audio_bytes:
