@@ -1,0 +1,84 @@
+Excellent question. Expanding beyond Socratic and Feynman gives you a truly holistic AI tutor. Here are powerful pedagogical approaches to incorporate, each with their unique prompt strategies and ideal use cases.
+
+### **1. Constructivism (Piaget/Vygotsky)**
+*   **Core Idea:** Learners actively construct knowledge through experiences and social interaction. The **Zone of Proximal Development (ZPD)** is key—the space between what a learner can do alone vs. with guidance.
+*   **AI Implementation:** The AI acts as the "More Knowledgeable Other" (MKO) to scaffold learning within the user's ZPD.
+*   **Prompts & Behaviors:**
+    *   **Diagnose ZPD:** *"What part of this can you do on your own? Where do you get stuck?"*
+    *   **Scaffolding:** Provide temporary frameworks. *"Let's try an example together. I'll do the first two steps, you complete the third."* Gradually remove support ("fading").
+    *   **Connect to Prior Knowledge:** *"How does this relate to [concept you already know]?"*
+    *   **Social Learning Simulation:** *"Imagine you're explaining this to a peer who missed class. What's the first thing you'd say?"*
+
+### **2. Deliberate Practice (Anders Ericsson)**
+*   **Core Idea:** Expertise comes from focused, repetitive practice on specific sub-skills with immediate feedback, just beyond one's comfort zone.
+*   **AI Implementation:** Break skills into micro-components, design targeted exercises, provide precise feedback loops.
+*   **Prompts & Behaviors:**
+    *   **Skill Decomposition:** *"Let's isolate the hardest part. Is it the syntax, the logic flow, or the error handling?"*
+    *   **Focused Repetition:** *"Now, let's do 3 variations of this same problem type, each slightly harder."*
+    *   **Immediate, Specific Feedback:** Not *"Good job,"* but *"Your method was efficient, but you missed the edge case where n=0. Let's fix that now."*
+    *   **Set Stretch Goals:** *"Last time you scored 70%. Let's aim for 80% accuracy on this focused set."*
+
+### **3. Bloom's Taxonomy (Cognitive Domain)**
+*   **Core Idea:** Learning objectives are hierarchical: Remember → Understand → Apply → Analyze → Evaluate → Create.
+*   **AI Implementation:** Diagnose the user's current level and deliberately push them to the next.
+*   **Prompts & Behaviors (by level):**
+    *   **Remember/Understand:** *"Define X. Paraphrase this concept."* (Foundation)
+    *   **Apply:** *"Use this formula to solve this new problem."*
+    *   **Analyze:** *"Compare and contrast Method A and Method B. What are the underlying assumptions?"*
+    *   **Evaluate:** *"Critique this argument. Which solution is more robust and why?"*
+    *   **Create:** *"Design a new system/model/experiment that addresses the flaws we've identified."*
+    *   **AI Question:** *"You seem comfortable applying the rule. Are you ready to analyze why it works?"*
+
+### **4. Spaced Repetition & Interleaving (Cognitive Science)**
+*   **Core Idea:** Memory is strengthened by reviewing information at increasing intervals (spaced repetition) and mixing different topics/problems (interleaving) to improve discrimination and long-term retention.
+*   **AI Implementation:** Build a memory system. Schedule review of past topics and mix problem types.
+*   **Prompts & Behaviors:**
+    *   **Strategic Review:** *"It's been 3 days since we covered logarithmic rules. Let's quickly solve two problems to reinforce it before moving on."*
+    *   **Interleaved Practice:** Instead of 10 algebra problems, then 10 geometry problems: *"Now solve this algebra problem... Next, a geometry problem that uses algebra... Next, an algebra problem requiring a different technique."*
+    *   **Metacognition Prompt:** *"Notice how we're switching topics? This helps your brain learn *when* to apply each technique, not just *how*."*
+
+### **5. Metacognitive Strategies (John Flavell)**
+*   **Core Idea:** Teaching learners to think about their own thinking (plan, monitor, and evaluate their learning).
+*   **AI Implementation:** Make the AI a metacognitive coach.
+*   **Prompts & Behaviors:**
+    *   **Planning:** *"Before we start, what's your strategy for tackling this?"*
+    *   **Monitoring:** *"As you're working, pause. Does that step make sense? Are you on the right track?"*
+    *   **Evaluation:** *"After finishing, what worked well? What would you do differently next time?"*
+    *   **Error Analysis:** *"Let's categorize your mistake: was it a careless slip, a conceptual misunderstanding, or a procedural error?"*
+
+### **6. Inquiry-Based Learning**
+*   **Core Idea:** Learning is driven by questions, problems, or scenarios. The learner formulates questions and investigates answers.
+*   **AI Implementation:** The AI doesn't answer; it helps refine questions and guides the search for evidence.
+*   **Prompts & Behaviors:**
+    *   **Question Formulation:** *"What's a testable question we could ask about this phenomenon?"*
+    *   **Hypothesis Generation:** *"Based on what you know, what might be a possible explanation (hypothesis)?"*
+    *   **Evidence Gathering:** *"What kind of data or information would support or refute your hypothesis?"*
+    *   **Guidance, Not Answers:** *"That's an interesting path. What resources could you check to explore it further?"*
+
+### **7. Universal Design for Learning (UDL)**
+*   **Core Idea:** Provide multiple means of engagement, representation, and action/expression to reach all learners.
+*   **AI Implementation:** Offer content and interaction in varied formats.
+*   **Prompts & Behaviors:**
+    *   **Multiple Representations:** *"Would you prefer I explain this with a text description, a diagram, a step-by-step list, or an analogy?"*
+    *   **Multiple Means of Action:** *"To show your understanding, would you like to write a summary, draw a concept map, or explain it verbally?"*
+    *   **Engagement Options:** *"We can approach this as a puzzle, a real-world case study, or a debate. Which intrigues you?"*
+
+---
+
+### **Synthesis: The "Ultimate Pedagogical AI" Prompt Blueprint**
+
+Here’s how you could integrate these into a master system instruction:
+
+> **You are an expert adaptive tutor. Your core methodology integrates:**
+> **1. Socratic Questioning & the Feynman Technique** as your primary dialogue engine.
+> **2. Constructivist Scaffolding:** Begin by diagnosing the user's **Zone of Proximal Development (ZPD)**. Provide temporary supports (examples, hints, partial solutions) and fade them as competence grows.
+> **3. Deliberate Practice & Metacognition:** Break skills into micro-components for focused practice. Act as a **metacognitive coach**, constantly asking: *"What's your plan?"*, *"How is it going?"*, *"What did you learn?"*
+> **4. Bloom's Taxonomy Progression:** Gently push the user from lower-order (Remember, Understand) to higher-order thinking (Analyze, Evaluate, Create). Announce the shift: *"You've mastered applying it. Let's now evaluate its limitations."*
+> **5. Spaced Repetition Scheduler:** Maintain a simple mental log. Periodically interleave review of older topics using prompts like: *"Let's revisit [Topic A] to strengthen long-term memory. How would you approach this now?"*
+> **6. UDL Flexibility:** Offer **choices** in content format (text, diagram, analogy) and expression (teach-back, diagram, solve a problem). Adapt to user preference.
+>
+> **Your default mode is inquiry-based.** Foster curiosity. Respond to questions with: *"That's an excellent question. How might we investigate that?"*
+>
+> **First Interaction:** *"Welcome. What would you like to learn? And to help me tailor this, could you tell me one thing you already know about it, and one specific goal you have?"*
+
+This creates an AI that is not just a **knowledge source**, but a **cognitive coach, curriculum designer, and metacognitive partner**—all personalized in real-time.
