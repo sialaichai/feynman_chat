@@ -64,7 +64,7 @@ def check_login():
         st.title("🔐 H2 Physics Tutor")
         st.markdown("**JPJC Physics Feynman Bot - Login Required**")
         
-        if "APP_PASSWORD" not in st.secrets:
+        if "APP_PASSWORD" not in os.environ:
             st.error("⚠️ Password not configured.")
             st.stop()
         
@@ -159,8 +159,8 @@ def search_image(query):
     """MASTER FUNCTION: Google Key 1 -> Google Key 2 -> DuckDuckGo"""
     
     def get_secret(name):
-        if name in st.secrets:
-            return st.secrets[name]
+        if name in os.environ:
+            return os.environ[name]
         return os.environ.get(name)
 
     cx = get_secret("GOOGLE_CX")
