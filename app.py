@@ -375,7 +375,7 @@ CORE_PEDAGOGY = """
 USER_LEVEL_INSTRUCTIONS = {
     "Beginner": "**Beginner:** Simple steps, everyday analogies.",
     "Intermediate": "**Intermediate:** Balance concepts and math.",
-    "Advance": "**Advanced:** Focus on derivations, skip basics."
+    "Advance": "**Advanced:** Focus on concepts, skip basics."
 }
 
 # ============================================================
