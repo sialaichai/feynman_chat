@@ -61,26 +61,13 @@ USER_LEVEL_INSTRUCTIONS = {
 }
 
 # ============================================================
-# 3. AUTHENTICATION (Optional)
+# 3. AUTHENTICATION (FIXED)
 # ============================================================
 def check_login():
     """Check if user is logged in."""
     if "APP_PASSWORD" not in os.environ:
         return True # No password set in env, skip login
 
-    def authenticate():
-        entered_password = st.session_state.get("login_password", "")
-        stored_password = os.environ.get("APP_PASSWORD", "")
-        
-        if entered_password == stored_password:
-            st.session_state["authenticated"] = True
-            if "login_password" in st.session_state:
-                del st.session_state["login_password"]
-            st.rerun()
-        else:
-            st.session_state["authenticated"] = False
-            st.error("Incorrect password.")
-    
     if "authenticated" not in st.session_state:
         st.session_state["authenticated"] = False
     
@@ -92,8 +79,15 @@ def check_login():
     with col2:
         st.title("🔐 H2 Physics Tutor")
         with st.form("login_form"):
-            st.text_input("Enter access password:", type="password", key="login_password")
-            st.form_submit_button("Login", type="primary", on_click=authenticate)
+            entered_password = st.text_input("Enter access password:", type="password")
+            # FIX: Logic moved inside the if block, removed on_click callback
+            if st.form_submit_button("Login", type="primary"):
+                stored_password = os.environ.get("APP_PASSWORD", "")
+                if entered_password == stored_password:
+                    st.session_state["authenticated"] = True
+                    st.rerun()
+                else:
+                    st.error("Incorrect password.")
     
     st.stop()
     return False
@@ -355,7 +349,6 @@ if prompt := st.chat_input("Ask a physics question..."):
                 response_text = call_gemini(st.session_state.messages, gemini_key, current_instruction)
                 used_model = "Gemini"
             except Exception as e:
-                print(f"Gemini Error: {e}")
                 # If DeepSeek is available, suppress error and fall through. If not, stop.
                 if not deepseek_key:
                     st.error(f"Gemini failed and no DeepSeek key provided. Error: {e}")
