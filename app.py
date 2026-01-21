@@ -294,7 +294,7 @@ with st.sidebar:
 if "messages" not in st.session_state:
     st.session_state.messages = [{
         "role": "assistant", 
-        "content": "Hello! I'm your Feynman Physics tutor. What concept shall we explore today?"
+        "content": "Hello! I'm your JPJC Physics tutor. What concept shall we explore today?"
     }]
 
 # Display History
