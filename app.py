@@ -16,7 +16,7 @@ st.set_page_config(page_title="H2 Feynman Bot", page_icon="⚛️", layout="cent
 st.markdown("""
 <style>
     /* Make equations look better */
-    .stLatex {
+    .st {
         font-size: 1.1em;
         margin: 10px 0;
         padding: 10px;
@@ -175,7 +175,7 @@ def fix_latex(text):
     # Convert \[ ... \] to $$ ... $$ (display math)
     text = re.sub(r'\\\[(.*?)\\\]', r'$$\1$$', text, flags=re.DOTALL)
     # Convert \( ... \) to $ ... $ (inline math)
-    text = re.sub(r'\\\((.*?)\\\)', r'$\1$', text)
+    #text = re.sub(r'\\\((.*?)\\\)', r'$\1$', text)
     # Wrap standalone equations that use = and \ but miss $
     if '=' in text and '\\' in text and not '$' in text:
         text = re.sub(r'([a-zA-Zα-ωΑ-Ω_]+\s*=\s*\\[^ ]+.*?)(?=\s|$|\.|,)', r'$\1$', text)
