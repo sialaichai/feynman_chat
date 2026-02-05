@@ -9,6 +9,96 @@ import json
 import random
 from gtts import gTTS
 from duckduckgo_search import DDGS
+import re
+import math
+
+def normalize_and_compare_numerical(user_answer, expected_answer, rel_tol=0.02, abs_tol=1e-9):
+    """
+    Compare numerical answers with tolerance after normalizing formats.
+    Handles: 
+      - Scientific notation variants (1e-3, 1 x 10^-3, 1×10⁻³)
+      - Units stripping (m/s, N, kg, etc.)
+      - Unicode characters (×, ⁻, ⁰, ¹, ², ³)
+      - Fractions (1/2 → 0.5)
+      - Relative tolerance (default 2%) + absolute tolerance
+    
+    Returns: (is_correct: bool, normalized_user: str, normalized_expected: str)
+    """
+    def parse_to_float(answer_str):
+        if not isinstance(answer_str, str) or not answer_str.strip():
+            raise ValueError("Empty answer")
+        
+        s = answer_str.strip()
+        
+        # Remove common physics units (case-insensitive, at end of string)
+        unit_patterns = [
+            r'\s*m/s²?$', r'\s*ms\^{-2}$', r'\s*kg$', r'\s*N$', 
+            r'\s*J$', r'\s*W$', r'\s*Pa$', r'\s*s$', r'\s*m$', 
+            r'\s*rad/s²?$', r'\s*C$', r'\s*V$', r'\s*Ω$', r'\s*A$'
+        ]
+        for pattern in unit_patterns:
+            s = re.sub(pattern, '', s, flags=re.IGNORECASE)
+        s = s.strip()
+        
+        # Convert Unicode superscripts/subscripts to ASCII
+        unicode_map = {
+            '⁰': '0', '¹': '1', '²': '2', '³': '3', '⁴': '4', '⁵': '5',
+            '⁶': '6', '⁷': '7', '⁸': '8', '⁹': '9', '⁻': '-', '⁺': '+',
+            '×': 'x', '·': '*', '−': '-', '–': '-', '—': '-'
+        }
+        for uni, ascii in unicode_map.items():
+            s = s.replace(uni, ascii)
+        
+        # Normalize scientific notation variants to 'e' format
+        # Handles: "1 x 10^-3", "1*10^-3", "1×10^-3", "1 10^-3"
+        s = re.sub(r'(\d)\s*[xX×\*]\s*10\^?(-?\d+)', r'\1e\2', s)
+        s = re.sub(r'(\d)\s*10\^?(-?\d+)', r'\1e\2', s)  # "1 10^-3" → "1e-3"
+        
+        # Handle fractions: "1/2" → 0.5
+        if re.fullmatch(r'\d+/\d+', s.strip()):
+            num, denom = map(float, s.strip().split('/'))
+            return num / denom
+        
+        # Handle simple expressions WITHOUT eval() (security!)
+        # Only allow: digits, ., e, +, -, *, /, (, ), space
+        if re.fullmatch(r'[\d\s\.\+\-\*\/\(\)eE]+', s):
+            try:
+                # Safe evaluation using ast.literal_eval won't work for expressions
+                # Instead, use a restricted parser (simplified for common physics calcs)
+                s = s.replace(' ', '').replace('^', '**')
+                # VERY restricted eval - ONLY for trusted educational context
+                # For production, use a proper math parser like simpleeval
+                return float(eval(s, {"__builtins__": {}}, {}))
+            except:
+                pass
+        
+        # Final attempt: direct float conversion
+        return float(s)
+    
+    try:
+        user_val = parse_to_float(user_answer)
+        expected_val = parse_to_float(expected_answer)
+        
+        # Physics-appropriate comparison: relative tolerance (2%) OR absolute tolerance
+        diff = abs(user_val - expected_val)
+        allowed_error = max(rel_tol * max(abs(user_val), abs(expected_val)), abs_tol)
+        is_correct = diff <= allowed_error
+        
+        # Format for display (show 3 sig figs for small numbers, else scientific)
+        def format_val(v):
+            if abs(v) < 0.001 or abs(v) >= 1000:
+                return f"{v:.3e}"
+            else:
+                return f"{v:.3g}"
+        
+        return is_correct, format_val(user_val), format_val(expected_val)
+    
+    except Exception as e:
+        # Fall back to case-insensitive string match (for conceptual answers)
+        user_clean = re.sub(r'\s+', ' ', user_answer.strip().lower())
+        expected_clean = re.sub(r'\s+', ' ', expected_answer.strip().lower())
+        return user_clean == expected_clean, user_answer, expected_answer
+
 
 # ============================================================
 # 1. PAGE CONFIG & STYLING
@@ -424,28 +514,46 @@ def display_quiz_question(question_data, question_index):
                         explanation = question_data.get('explanation', 'No explanation provided.')
                         st.markdown(f"**Explanation:** {explanation}")
         
-        elif question_data['question_type'] == 'open_ended':
-            # Open-ended question
-            user_answer = st.text_input(
-                f"Your answer (Question {question_index + 1}):",
-                key=f"open_answer_{question_index}",
-                placeholder="Enter your calculation or explanation..."
-            )
-            
-            if st.button("Submit Answer", key=f"submit_{question_index}"):
-                if user_answer:
-                    st.session_state[f'user_answer_{question_index}'] = user_answer
-                    st.session_state[f'answered_{question_index}'] = True
-                    st.rerun()
-            
-            if st.session_state.get(f'answered_{question_index}', False):
-                st.info(f"**Your answer:** {user_answer}")
-                correct_answer = question_data.get('correct_answer', 'No correct answer provided.')
-                st.success(f"**Correct answer:** {correct_answer}")
-                
-                with st.expander("View Explanation"):
-                    explanation = question_data.get('explanation', 'No explanation provided.')
-                    st.markdown(f"**Explanation:** {explanation}")
+elif question_data['question_type'] == 'open_ended':
+    # Open-ended question
+    user_answer = st.text_input(
+        f"Your answer (Question {question_index + 1}):",
+        key=f"open_answer_{question_index}",
+        placeholder="Enter your calculation or explanation..."
+    )
+    
+    if st.button("Submit Answer", key=f"submit_{question_index}"):
+        if user_answer:
+            st.session_state[f'user_answer_{question_index}'] = user_answer
+            st.session_state[f'answered_{question_index}'] = True
+            st.rerun()
+    
+    if st.session_state.get(f'answered_{question_index}', False):
+        # Get answers
+        user_answer = st.session_state.get(f'user_answer_{question_index}', '')
+        correct_answer = question_data.get('correct_answer', 'No correct answer provided.')
+        
+        # 🔑 INTEGRATION POINT: Numerical-aware comparison
+        is_correct, user_display, expected_display = normalize_and_compare_numerical(
+            user_answer, 
+            correct_answer,
+            rel_tol=0.02  # 2% tolerance for physics calculations
+        )
+        
+        # Show feedback with numerical context
+        if is_correct:
+            st.success("✅ Correct!")
+            st.caption(f"Your answer ≈ {user_display} matches expected value {expected_display}")
+        else:
+            st.error("❌ Incorrect")
+            st.caption(f"Your answer: {user_display} | Expected: {expected_display}")
+            # Show helpful hint for common formats
+            st.caption("💡 Acceptable formats: `0.001`, `1e-3`, `1 x 10^-3`, `1×10⁻³`, `1/1000`")
+        
+        # Show explanation
+        with st.expander("View Explanation"):
+            explanation = question_data.get('explanation', 'No explanation provided.')
+            st.markdown(f"**Explanation:** {explanation}")
         
         else:
             st.error(f"Unknown question type: {question_data['question_type']}")
