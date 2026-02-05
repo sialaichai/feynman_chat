@@ -113,6 +113,35 @@ QUIZ_LEVELS = {
 }
 
 # ============================================================
+# SYLLABUS TOPICS (ADD THIS SECTION)
+# ============================================================
+
+physics_topics = [
+    "General / Any",
+    "1. Quantities and Measurement",
+    "2. Forces and Moments",
+    "3. Motion and Forces",
+    "4. Energy and Fields",
+    "5. Projectile Motion",
+    "6. Collisions",
+    "7. Circular Motion",
+    "8. Gravitational Fields",
+    "9. Oscillations",
+    "10. Wave Motion",
+    "11. Superposition",
+    "12. Temperature and Ideal Gases",
+    "13. Thermodynamic Systems",
+    "14. Electric Fields",
+    "15. Currents",
+    "16. Circuits",
+    "17. Electromagnetic Forces",
+    "18. Electromagnetic Induction",
+    "19. Quantum Physics",
+    "20. Nuclear Physics"
+]
+
+
+# ============================================================
 # 3. QUIZ FUNCTIONS
 # ============================================================
 
