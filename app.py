@@ -727,7 +727,7 @@ with st.sidebar:
         help=QUIZ_LEVELS["Intermediate"]
     )
     
-    num_questions = st.slider("Number of questions:", 1, 10, 5)
+    num_questions = st.slider("Number of questions:", 1, 5, 3)
     
     # --- Button with validation ---
     is_topic_general = (quiz_topic == "General / Any")
