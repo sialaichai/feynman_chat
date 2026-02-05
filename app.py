@@ -1017,8 +1017,7 @@ Ready to explore physics? Select a topic above! ⚛️"""
     # Show guidance if no topic selected
     if topic == "General / Any":
         st.info("""
-        **📚 Syllabus-Aligned Learning Required**
-        **Select a specific topic** from the sidebar (not 'General / Any')
+        **📚 **Select a specific topic** from the sidebar (not 'General / Any')
         """)
 
     # User Input - DISABLED when no topic selected
