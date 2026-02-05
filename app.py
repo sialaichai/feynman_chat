@@ -778,11 +778,14 @@ with st.sidebar:
 
                     response = call_deepseek(quiz_messages, deepseek_key, quiz_system_instruction)
 
-                    # ✅ DEBUG BLOCK INSERTED HERE
-                    raw_quiz_text = response.choices[0].message.content.strip()
-                    with st.expander("🐞 DEBUG: Raw API Response", expanded=True):
-                        st.text(raw_quiz_text)
-                        st.caption(f"Length: {len(raw_quiz_text)} chars")
+                    # ✅ INSERT DEBUG BLOCK HERE — THIS IS THE CORRECT SPOT
+                    with st.expander("🐞 DEBUG: Raw Quiz Text (Before JSON Parsing)", expanded=True):
+                        st.subheader("Full raw output:")
+                        st.text(quiz_text)
+                        st.subheader("First 600 characters:")
+                        st.code(quiz_text[:600], language="text")
+                        st.caption(f"Total length: {len(quiz_text)} characters")
+
                     
                     # Parse the response
                     quiz_questions = parse_quiz_response(response)
