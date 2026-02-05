@@ -1002,7 +1002,7 @@ else:
             "content": f"""Hello! I'm your JPJC Physics tutor.
 
 **To get started:**
-1. **Select a specific topic** from the sidebar (not 'General / Any')
+1. **Select a specific topic** from the sidebar (not 'NIL')
 2. Choose your learning level (Beginner/Intermediate/Advanced)
 3. Ask your physics question!
 4. Generate Quiz to check your understanding.
@@ -1015,14 +1015,14 @@ Ready to explore physics? Select a topic above! ⚛️"""
         display_message(msg["role"], msg["content"], enable_voice)
 
     # Show guidance if no topic selected
-    if topic == "General / Any":
+    if topic == "NIL":
         st.info("""
-        **📚 **Select a specific topic** from the sidebar (not 'General / Any')
+        **📚 **Select a specific topic** from the sidebar (not 'NIL')
         """)
 
     # User Input - DISABLED when no topic selected
 # User Input - DISABLED when no topic selected
-chat_disabled = (topic == "General / Any")
+chat_disabled = (topic == "NIL")
 placeholder = "Select a topic above to ask questions..." if chat_disabled else f"Ask about {topic}..."
 
 if prompt := st.chat_input(placeholder, disabled=chat_disabled):
@@ -1032,7 +1032,7 @@ if prompt := st.chat_input(placeholder, disabled=chat_disabled):
         st.stop()
     
     # Topic is already enforced by disabled chat input, but double-check
-    if topic == "General / Any":
+    if topic == "NIL":
         st.error("❌ Please select a specific topic from the sidebar first.")
         st.stop()
     
