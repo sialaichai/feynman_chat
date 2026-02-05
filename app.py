@@ -460,24 +460,24 @@ def fix_json_string(json_str):
 
 def display_quiz_question(question_data, question_index):
     """Display a single quiz question with its components."""
-    
     # DEFENSIVE CHECK: Ensure required keys exist
     if 'question_type' not in question_data:
         st.error(f"Question {question_index + 1} has invalid format (missing question_type).")
         return
     
+    # 🔑 CRITICAL FIX: Normalize question type to handle casing/formatting variations
+    raw_type = question_data.get('question_type', 'mcq')
+    question_type = str(raw_type).strip().lower().replace('-', '_').replace(' ', '_')
+    
     with st.container():
         st.markdown(f'<div class="quiz-question">', unsafe_allow_html=True)
-        
         # Display question number and text
         st.subheader(f"Question {question_index + 1} of {len(st.session_state.quiz_questions)}")
-        
-        # Safely get question text
         question_text = question_data.get('question', f'Question {question_index + 1}')
         st.markdown(f"**{question_text}**")
         
-        # Handle different question types
-        if question_data['question_type'] == 'mcq':
+        # Handle different question types with normalized comparison
+        if question_type == 'mcq':
             # Get options safely
             options = question_data.get('options', [])
             if not options or len(options) == 0:
@@ -486,7 +486,6 @@ def display_quiz_question(question_data, question_index):
             
             # Display MCQ options
             selected_option = st.session_state.get(f'selected_option_{question_index}', None)
-            
             for i, option in enumerate(options):
                 option_key = f"option_{question_index}_{i}"
                 if st.button(option, key=option_key, use_container_width=True):
@@ -514,68 +513,69 @@ def display_quiz_question(question_data, question_index):
                         explanation = question_data.get('explanation', 'No explanation provided.')
                         st.markdown(f"**Explanation:** {explanation}")
         
-                elif question_data['question_type'] == 'open_ended':
-                    # Open-ended question
-                    user_answer = st.text_input(
-                        f"Your answer (Question {question_index + 1}):",
-                        key=f"open_answer_{question_index}",
-                        placeholder="Enter your calculation or explanation..."
-                    )
-                    
-                    if st.button("Submit Answer", key=f"submit_{question_index}"):
-                        if user_answer:
-                            st.session_state[f'user_answer_{question_index}'] = user_answer
-                            st.session_state[f'answered_{question_index}'] = True
-                            st.rerun()
-                    
-                    if st.session_state.get(f'answered_{question_index}', False):
-                        # Get answers
-                        user_answer = st.session_state.get(f'user_answer_{question_index}', '')
-                        correct_answer = question_data.get('correct_answer', 'No correct answer provided.')
-                        
-                        # 🔑 INTEGRATION POINT: Numerical-aware comparison
-                        is_correct, user_display, expected_display = normalize_and_compare_numerical(
-                            user_answer, 
-                            correct_answer,
-                            rel_tol=0.02  # 2% tolerance for physics calculations
-                        )
-                        
-                        # Show feedback with numerical context
-                        if is_correct:
-                            st.success("✅ Correct!")
-                            st.caption(f"Your answer ≈ {user_display} matches expected value {expected_display}")
-                        else:
-                            st.error("❌ Incorrect")
-                            st.caption(f"Your answer: {user_display} | Expected: {expected_display}")
-                            # Show helpful hint for common formats
-                            st.caption("💡 Acceptable formats: `0.001`, `1e-3`, `1 x 10^-3`, `1×10⁻³`, `1/1000`")
-                        
-                        # Show explanation
-                        with st.expander("View Explanation"):
-                            explanation = question_data.get('explanation', 'No explanation provided.')
-                            st.markdown(f"**Explanation:** {explanation}")
+        elif question_type in ['open_ended', 'openended', 'openendedquestion', 'shortanswer']:
+            # 🔑 OPEN-ENDED: Numerical-aware comparison integrated here
+            user_answer = st.text_input(
+                f"Your answer (Question {question_index + 1}):",
+                key=f"open_answer_{question_index}",
+                placeholder="e.g., 0.001, 1e-3, 1 x 10^-3, 5.0 m/s, or 'increases'"
+            )
+            
+            if st.button("Submit Answer", key=f"submit_{question_index}"):
+                if user_answer:
+                    st.session_state[f'user_answer_{question_index}'] = user_answer
+                    st.session_state[f'answered_{question_index}'] = True
+                    st.rerun()
+            
+            if st.session_state.get(f'answered_{question_index}', False):
+                user_answer = st.session_state.get(f'user_answer_{question_index}', '')
+                correct_answer = question_data.get('correct_answer', 'No correct answer provided.')
+                
+                # Numerical-aware comparison
+                is_correct, user_display, expected_display = normalize_and_compare_numerical(
+                    user_answer, 
+                    correct_answer,
+                    rel_tol=0.02  # 2% tolerance for physics calculations
+                )
+                
+                # Show feedback
+                if is_correct:
+                    st.success("✅ Correct!")
+                    st.caption(f"Your answer ≈ {user_display} matches expected value {expected_display}")
+                else:
+                    st.error("❌ Incorrect")
+                    st.caption(f"Your answer: {user_display} | Expected: {expected_display}")
+                    st.caption("💡 Acceptable formats: `0.001`, `1e-3`, `1 x 10^-3`, `1×10⁻³`, `1/1000`")
+                
+                # Show explanation
+                with st.expander("View Explanation"):
+                    explanation = question_data.get('explanation', 'No explanation provided.')
+                    st.markdown(f"**Explanation:** {explanation}")
         
         else:
-            st.error(f"Unknown question type: {question_data['question_type']}")
-        
-        st.markdown('</div>', unsafe_allow_html=True)
-        
-        # Navigation buttons
-        col1, col2, col3, col4 = st.columns(4)
-        with col1:
-            if question_index > 0:
-                if st.button("← Previous", key=f"prev_{question_index}"):
-                    st.session_state.current_question = question_index - 1
-                    st.rerun()
-        with col4:
-            if question_index < len(st.session_state.quiz_questions) - 1:
-                if st.button("Next →", key=f"next_{question_index}"):
-                    st.session_state.current_question = question_index + 1
-                    st.rerun()
-        
-        # Quiz progress
-        st.progress((question_index + 1) / len(st.session_state.quiz_questions))
-        st.caption(f"Progress: {question_index + 1}/{len(st.session_state.quiz_questions)}")
+            # Debug info for unknown types
+            st.error(f"Unknown question type: '{raw_type}' (normalized to '{question_type}')")
+            st.caption("Expected 'mcq' or 'open_ended'. Check quiz generation prompt.")
+            st.json(question_data)  # Show full question data for debugging
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Navigation buttons
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        if question_index > 0:
+            if st.button("← Previous", key=f"prev_{question_index}"):
+                st.session_state.current_question = question_index - 1
+                st.rerun()
+    with col4:
+        if question_index < len(st.session_state.quiz_questions) - 1:
+            if st.button("Next →", key=f"next_{question_index}"):
+                st.session_state.current_question = question_index + 1
+                st.rerun()
+    
+    # Quiz progress
+    st.progress((question_index + 1) / len(st.session_state.quiz_questions))
+    st.caption(f"Progress: {question_index + 1}/{len(st.session_state.quiz_questions)}")
 
 # ============================================================
 # 5. AUTHENTICATION
