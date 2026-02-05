@@ -207,7 +207,7 @@ QUIZ_LEVELS = {
 # ============================================================
 
 physics_topics = [
-    "General / Any",
+    "NIL",
     "1. Quantities and Measurement",
     "2. Forces and Moments",
     "3. Motion and Forces",
@@ -796,7 +796,7 @@ with st.sidebar:
     )
     
     # Show warning if General/Any is selected
-    if topic == "General / Any":
+    if topic == "NIL":
         st.warning("⚠️ Select a specific topic for syllabus-aligned explanations")
     else:
         # Show learning outcomes preview
@@ -838,7 +838,7 @@ with st.sidebar:
     num_questions = st.slider("Number of questions:", 1, 5, 3)
     
     # --- Button with validation ---
-    is_topic_general = (quiz_topic == "General / Any")
+    is_topic_general = (quiz_topic == "NIL")
     
     if st.button("🎯 Generate Quiz", 
                  type="primary", 
