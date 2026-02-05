@@ -664,7 +664,7 @@ with st.sidebar:
     # USER LEVEL SELECTION
     user_level = st.select_slider(
         "Level:", 
-        options=["Beginner", "Interactive", "Advance"], 
+        options=["Beginner", "Intermediate", "Advance"], 
         value="Intermediate"
     )
     
