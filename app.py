@@ -1006,11 +1006,6 @@ else:
 2. Choose your learning level (Beginner/Intermediate/Advanced)
 3. Ask your physics question!
 
-**Why select a topic?**
-- Get explanations aligned with SEAB H2 Physics syllabus
-- Focus on specific learning outcomes
-- Receive exam-relevant examples and explanations
-
 Ready to explore physics? Select a topic above! ⚛️"""
         }]
 
