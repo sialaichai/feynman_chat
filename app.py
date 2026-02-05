@@ -256,106 +256,69 @@ def parse_quiz_response(response_text):
         start_idx = response_text.find('[')
         end_idx = response_text.rfind(']')
         if start_idx == -1 or end_idx == -1:
-            st.error("❌ No JSON array boundaries found ([ or ]) in response")
-            with st.expander("🐞 Raw Response (First 1000 chars)", expanded=True):
+            st.error("❌ No JSON array boundaries found")
+            with st.expander("🐞 Raw Response", expanded=True):
                 st.code(response_text[:1000], language="text")
             return None
         
-        json_str = response_text[start_idx:end_idx + 1]
+        json_str = response_text[start_idx:end_idx + 1].strip()
         
-        # === CRITICAL FIX: Handle unescaped quotes safely ===
-        # Instead of fragile regex, use character-by-character parsing
-        def fix_unescaped_quotes(json_fragment):
-            result = []
-            in_string = False
-            escape_next = False
-            for i, char in enumerate(json_fragment):
-                if escape_next:
-                    result.append(char)
-                    escape_next = False
-                    continue
-                
-                if char == '\\':
-                    result.append(char)
-                    escape_next = True
-                    continue
-                
-                if char == '"':
-                    # Check if this quote is inside a key (before colon) or value (after colon)
-                    # Simple heuristic: if previous non-whitespace char was : or { or , → likely start of value
-                    prev_chars = ''.join(result[-10:]).rstrip()
-                    if not in_string and (prev_chars.endswith(':') or prev_chars.endswith('{') or prev_chars.endswith(',')):
-                        in_string = True
-                        result.append(char)
-                    elif in_string:
-                        # Look ahead: if next non-whitespace is , } ] → this is end of string
-                        next_chars = json_fragment[i+1:i+10].lstrip()
-                        if next_chars.startswith((',', '}', ']')):
-                            in_string = False
-                            result.append(char)
-                        else:
-                            # Likely unescaped quote INSIDE string → escape it
-                            result.append('\\"')
+        # Remove markdown wrappers if present
+        json_str = re.sub(r'^```json\s*', '', json_str)
+        json_str = re.sub(r'^```\s*', '', json_str)
+        json_str = re.sub(r'\s*```$', '', json_str)
+        
+        # Fix 1: Handle unescaped quotes safely using state machine
+        def fix_quotes_safe(s):
+            result, in_str, esc = [], False, False
+            for i, c in enumerate(s):
+                if esc: 
+                    result.append(c); esc = False; continue
+                if c == '\\': 
+                    result.append(c); esc = True; continue
+                if c == '"':
+                    if not in_str: 
+                        in_str = True
                     else:
-                        result.append(char)
-                else:
-                    result.append(char)
+                        # Check if this quote ends the string
+                        next_chars = s[i+1:].lstrip()
+                        if next_chars and next_chars[0] in ',}]:':
+                            in_str = False
+                        else:
+                            result.append('\\')  # Escape internal quote
+                    result.append(c)
+                    continue
+                result.append(c)
             return ''.join(result)
         
-        # Apply fixes
-        fixed_json = fix_unescaped_quotes(json_str)
+        fixed_json = fix_quotes_safe(json_str)
         fixed_json = re.sub(r",\s*([\]}])", r"\1", fixed_json)  # Remove trailing commas
-        fixed_json = re.sub(r"'([^']+)':", r'"\1":', fixed_json)  # Fix single-quoted keys
         
-        # Parse
+        # Parse and validate
         questions = json.loads(fixed_json)
+        if not isinstance(questions, list): questions = [questions]
         
-        if not isinstance(questions, list):
-            questions = [questions]
-        
-        # Validate structure
         validated = []
         for i, q in enumerate(questions):
-            if not isinstance(q, dict):
-                st.warning(f"⚠️ Skipping non-dict item #{i+1}")
-                continue
-            
-            validated_q = {
+            if not isinstance(q, dict): continue
+            validated.append({
                 'question_number': int(q.get('question_number', i+1)),
                 'question_type': str(q.get('question_type', 'mcq')).lower(),
                 'question': str(q.get('question', f'Question {i+1}')).strip(),
-                'options': [str(opt).strip() for opt in q.get('options', [])] if isinstance(q.get('options'), list) else [],
+                'options': [str(o).strip() for o in q.get('options', [])] if isinstance(q.get('options'), list) else [],
                 'correct_answer': str(q.get('correct_answer', '')).strip(),
                 'explanation': str(q.get('explanation', '')).strip()
-            }
-            validated.append(validated_q)
+            })
         
-        st.success(f"✅ Successfully parsed {len(validated)} questions")
+        st.success(f"✅ Parsed {len(validated)} questions")
         return validated
         
-    except json.JSONDecodeError as e:
-        st.error(f"❌ JSON parse error at line {e.lineno}, col {e.colno} (char {e.pos}): {e.msg}")
-        
-        # Show RAW input BEFORE any cleanup
-        with st.expander("🐞 RAW INPUT (Before Parsing) - COPY THIS FOR DEBUGGING", expanded=True):
-            st.subheader("Full raw response:")
-            st.text(response_text)
-            st.caption(f"Total length: {len(response_text)} characters")
-        
-        # Show problematic region
-        if 'json_str' in locals() and len(json_str) > e.pos:
-            char_start = max(0, e.pos - 80)
-            char_end = min(len(json_str), e.pos + 80)
-            st.subheader(f"Problem region (chars {char_start}-{char_end}):")
-            st.code(json_str[char_start:char_end], language="text")
-            st.caption("💡 Look for unescaped quotes like `\"text\"here\"` or missing commas")
-        
-        return None
     except Exception as e:
-        st.error(f"❌ Unexpected error: {type(e).__name__} - {e}")
-        import traceback
-        st.code(traceback.format_exc(), language="python")
+        st.error(f"❌ Parse failed: {type(e).__name__} - {str(e)[:100]}")
+        with st.expander("🐞 Debug Raw Response", expanded=True):
+            st.text(response_text[:1200])
         return None
+        
 def fix_json_string(json_str):
     """Fix common JSON formatting issues."""
     if not json_str:
@@ -777,24 +740,19 @@ with st.sidebar:
                         {"role": "user", "content": quiz_prompt}
                     ]
                     
-                    # System instruction for quiz generation
-                    quiz_system_instruction = """You are a strict JSON generator for H2 Physics quizzes. FOLLOW THESE RULES EXACTLY:
+                    quiz_system_instruction = """You are a STRICT JSON generator. FOLLOW EXACTLY:
                     
-                    1. OUTPUT ONLY a VALID JSON ARRAY. NO text before/after. NO markdown. NO comments.
-                    2. Use DOUBLE quotes for keys/strings ONLY. NEVER use single quotes for keys.
-                    3. NEVER use unescaped double quotes inside string values. 
-                       ❌ BAD: "question": "What is "F=ma"?"
-                       ✅ GOOD: "question": "What is F=ma?"
-                       ✅ ALSO GOOD: "question": "What is \\"F=ma\\"?" (if you MUST quote)
-                    4. Escape ALL internal double quotes with backslash: \\"
-                    5. NO trailing commas before ] or }
-                    6. MCQ options MUST be exactly 4 strings
-                    7. Use LaTeX with single $: $F=ma$. NEVER wrap LaTeX in quotes like "$F=ma$"
+                    1. OUTPUT ONLY a VALID JSON ARRAY. NO text before/after. NO markdown.
+                    2. Use DOUBLE quotes ONLY. Escape internal quotes: \\"text\\"
+                    3. NO trailing commas before ] or }
+                    4. MCQ: exactly 4 options. Open-ended: "options": []
+                    5. Use LaTeX like $F=ma$ - NEVER wrap in extra quotes
+                    6. Describe diagrams in text - NO [IMAGE] tags
                     
-                    Example of CORRECT output:
-                    [{"question_number":1,"question_type":"mcq","question":"Newton's second law states that force equals mass times acceleration $F=ma$.","options":["$F=ma$","$F=mg$","$v=u+at$","$W=Fd$"],"correct_answer":"$F=ma$","explanation":"Newton's second law is $F=ma$ where F is net force."}]
+                    EXAMPLE:
+                    [{"question_number":1,"question_type":"mcq","question":"Force equals $F=ma$.","options":["$F=ma$","$F=mg$","$v=u+at$","$s=ut+\\frac{1}{2}at^2$"],"correct_answer":"$F=ma$","explanation":"Newton's second law"}]
                     
-                    VIOLATING THESE RULES WILL BREAK THE APP. OUTPUT ONLY THE JSON ARRAY."""
+                    OUTPUT ONLY THE JSON ARRAY."""
 
                     response = call_deepseek(quiz_messages, deepseek_key, quiz_system_instruction)
 
