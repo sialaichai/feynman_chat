@@ -527,6 +527,12 @@ with st.sidebar:
     # QUIZ SECTION
     # ============================================
     st.header("📝 Quiz Generator")
+
+    quiz_topic = st.selectbox(
+        "Quiz Topic:",
+        physics_topics,
+        key="quiz_topic"
+    )
     
     quiz_difficulty = st.selectbox(
         "Quiz Difficulty:",
