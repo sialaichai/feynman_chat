@@ -801,10 +801,10 @@ with st.sidebar:
                     # ✅ INSERT DEBUG BLOCK HERE — THIS IS THE CORRECT SPOT
                     with st.expander("🐞 DEBUG: Raw Quiz Text (Before JSON Parsing)", expanded=True):
                         st.subheader("Full raw output:")
-                        st.text(quiz_text)
+                        st.text(quiz_questions)
                         st.subheader("First 600 characters:")
-                        st.code(quiz_text[:600], language="text")
-                        st.caption(f"Total length: {len(quiz_text)} characters")
+                        st.code(quiz_questions[:600], language="text")
+                        st.caption(f"Total length: {len(quiz_questions)} characters")
 
                     
                     # Parse the response
