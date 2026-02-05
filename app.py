@@ -208,55 +208,161 @@ def generate_quiz_prompt(difficulty, topic_name, num_questions=20):
     return prompt
 
 def parse_quiz_response(response_text):
-    """Parse the AI response to extract quiz questions."""
+    """Parse the AI response to extract quiz questions with robust error handling."""
     try:
-        # Try to find JSON array in the response
-        json_match = re.search(r'\[\s*\{.*?\}\s*\]', response_text, re.DOTALL)
-        if json_match:
-            json_str = json_match.group()
-        else:
-            # If no array found, try to parse the entire response
-            json_str = response_text.strip()
+        # Debug: Log first 200 chars of response
+        print(f"DEBUG: Response preview: {response_text[:200]}...")
         
-        # Clean the JSON string
-        json_str = json_str.replace('```json', '').replace('```', '').strip()
+        # 1. Clean the response text thoroughly
+        # Remove markdown code blocks
+        clean_text = response_text.replace('```json', '').replace('```', '').strip()
         
-        # Parse JSON
-        questions = json.loads(json_str)
+        # 2. Try to extract JSON array with multiple patterns
+        json_str = None
+        patterns = [
+            r'\[\s*\{.*?\}\s*\]',  # Standard JSON array
+            r'\{.*?\}',  # Single object (wrap in array)
+        ]
         
-        # Validate each question has required fields
+        for pattern in patterns:
+            match = re.search(pattern, clean_text, re.DOTALL)
+            if match:
+                json_str = match.group()
+                break
+        
+        if not json_str:
+            # If no pattern matches, try the entire cleaned text
+            json_str = clean_text
+        
+        # 3. Fix common JSON issues
+        # Replace smart quotes with straight quotes
+        json_str = json_str.replace('"', '"').replace('"', '"')
+        json_str = json_str.replace("'", "'").replace("'", "'")
+        
+        # Escape unescaped quotes inside strings
+        # Pattern: find quotes that are not preceded by backslash but are inside a string value
+        def escape_quotes_in_strings(match):
+            # For values like: "question": "He said "hello" to me"
+            # We need to escape the inner quotes
+            text = match.group(0)
+            # Escape quotes that aren't already escaped
+            text = re.sub(r'(?<!\\)"', r'\"', text)
+            return text
+        
+        # Apply to all string values in the JSON
+        json_str = re.sub(r':\s*"[^"]*"', escape_quotes_in_strings, json_str)
+        
+        # 4. Try parsing with increasing leniency
+        questions = None
+        
+        # First try: standard JSON parsing
+        try:
+            questions = json.loads(json_str)
+        except json.JSONDecodeError as e1:
+            st.warning(f"First JSON parse failed: {e1}. Trying to fix common issues...")
+            
+            # Second try: fix trailing commas
+            json_str_fixed = re.sub(r',\s*}', '}', json_str)
+            json_str_fixed = re.sub(r',\s*\]', ']', json_str_fixed)
+            
+            try:
+                questions = json.loads(json_str_fixed)
+            except json.JSONDecodeError as e2:
+                st.warning(f"Second JSON parse failed: {e2}. Trying as single object...")
+                
+                # Third try: if it's a single object, wrap in array
+                if json_str_fixed.startswith('{') and json_str_fixed.endswith('}'):
+                    questions = [json.loads(json_str_fixed)]
+                else:
+                    # Last resort: manual extraction
+                    st.error("JSON parsing failed completely. Attempting manual extraction...")
+                    questions = extract_questions_manually(json_str_fixed)
+        
+        if not questions:
+            st.error("Could not parse any questions from the response.")
+            return None
+        
+        # 5. Ensure we have a list
+        if isinstance(questions, dict):
+            questions = [questions]
+        
+        # 6. Validate and clean each question
         valid_questions = []
         for i, q in enumerate(questions):
             if not isinstance(q, dict):
                 st.warning(f"Question {i} is not a dictionary, skipping")
                 continue
-                
-            if 'question_type' not in q:
-                st.warning(f"Question {i} missing 'question_type', setting to 'mcq'")
-                q['question_type'] = 'mcq'
             
-            if 'options' not in q and q.get('question_type') == 'mcq':
-                st.warning(f"MCQ question {i} missing 'options', setting empty list")
-                q['options'] = []
+            # Clean string values
+            cleaned_q = {}
+            for key, value in q.items():
+                if isinstance(value, str):
+                    # Remove common formatting issues
+                    cleaned_value = value.strip()
+                    # Remove any remaining unescaped quotes
+                    cleaned_value = cleaned_value.replace('\n', ' ').replace('\r', '')
+                    cleaned_q[key] = cleaned_value
+                else:
+                    cleaned_q[key] = value
             
-            # Ensure all required keys exist with defaults
-            q.setdefault('question', f"Question {i+1}")
-            q.setdefault('diagram_query', '')
-            q.setdefault('correct_answer', '')
-            q.setdefault('explanation', '')
+            # Ensure required fields with defaults
+            cleaned_q.setdefault('question_number', i + 1)
+            cleaned_q.setdefault('question_type', 'mcq')
+            cleaned_q.setdefault('question', f'Question {i + 1}')
+            cleaned_q.setdefault('diagram_query', '')
+            cleaned_q.setdefault('options', [])
+            cleaned_q.setdefault('correct_answer', '')
+            cleaned_q.setdefault('explanation', '')
             
-            valid_questions.append(q)
+            # If options is a string, try to parse it
+            if isinstance(cleaned_q['options'], str):
+                try:
+                    cleaned_q['options'] = json.loads(cleaned_q['options'])
+                except:
+                    # If it's not valid JSON, split by common delimiters
+                    options_str = cleaned_q['options']
+                    if ';' in options_str:
+                        cleaned_q['options'] = [opt.strip() for opt in options_str.split(';') if opt.strip()]
+                    elif ',' in options_str:
+                        cleaned_q['options'] = [opt.strip() for opt in options_str.split(',') if opt.strip()]
+                    else:
+                        cleaned_q['options'] = [options_str]
+            
+            valid_questions.append(cleaned_q)
         
+        st.success(f"Successfully parsed {len(valid_questions)} questions")
         return valid_questions
         
-    except json.JSONDecodeError as e:
-        st.error(f"Failed to parse JSON: {e}")
-        st.text("Raw response preview:")
-        st.text(response_text[:500] + "..." if len(response_text) > 500 else response_text)
-        return None
     except Exception as e:
-        st.error(f"Error parsing quiz: {e}")
+        st.error(f"Critical error in parse_quiz_response: {e}")
+        st.text("Failed response (first 1000 chars):")
+        st.text(response_text[:1000])
+        import traceback
+        st.text(f"Traceback: {traceback.format_exc()}")
         return None
+
+def extract_questions_manually(text):
+    """Fallback method to extract questions from malformed text."""
+    questions = []
+    
+    # Look for question-like patterns
+    question_patterns = [
+        r'"question"\s*:\s*"([^"]*)"',
+        r'"question"\s*:\s*\'([^\']*)\'',
+    ]
+    
+    for pattern in question_patterns:
+        matches = re.findall(pattern, text)
+        for match in matches:
+            questions.append({
+                'question': match,
+                'question_type': 'mcq',
+                'options': [],
+                'correct_answer': '',
+                'explanation': ''
+            })
+    
+    return questions
 
 def display_quiz_question(question_data, question_index):
     """Display a single quiz question with its components."""
