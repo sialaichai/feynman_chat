@@ -892,66 +892,60 @@ Ready to explore physics? Select a topic above! ⚛️"""
         """)
 
     # User Input - DISABLED when no topic selected
-    chat_disabled = (topic == "General / Any")
-    placeholder = "Select a topic above to ask questions..." if chat_disabled else f"Ask about {topic}..."
+# User Input - DISABLED when no topic selected
+chat_disabled = (topic == "General / Any")
+placeholder = "Select a topic above to ask questions..." if chat_disabled else f"Ask about {topic}..."
 
-    if prompt := st.chat_input(placeholder, disabled=chat_disabled):
-        
-        if not deepseek_key:
-            st.error("⚠️ Please provide a DeepSeek API Key in the sidebar.")
-            st.stop()
-        
-        # Topic is already enforced by disabled chat input, but double-check
-        if topic == "General / Any":
-            st.error("❌ Please select a specific topic from the sidebar first.")
-            st.stop()
-        
-        # Append user message
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        display_message("user", prompt)
-        
-        # Get syllabus outcomes for the selected topic
-        topic_outcomes = syllabus_details.get(topic, "")
-        
-        # Prepare System Prompt with Syllabus Outcomes
-        level_instruction_text = USER_LEVEL_INSTRUCTIONS.get(user_level, "")
-        
-        current_instruction = f"""You are teaching {topic} to a {user_level} level H2 Physics student.
+if prompt := st.chat_input(placeholder, disabled=chat_disabled):
+    
+    if not deepseek_key:
+        st.error("⚠️ Please provide a DeepSeek API Key in the sidebar.")
+        st.stop()
+    
+    # Topic is already enforced by disabled chat input, but double-check
+    if topic == "General / Any":
+        st.error("❌ Please select a specific topic from the sidebar first.")
+        st.stop()
+    
+    # Append user message
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    display_message("user", prompt)
+    
+    # Get syllabus outcomes for the selected topic
+    topic_outcomes = syllabus_details.get(topic, "")
+    
+    # Prepare System Prompt with Original Master Instruction
+    level_instruction_text = USER_LEVEL_INSTRUCTIONS.get(user_level, "")
+    
+    current_instruction = f"""{SEAB_H2_MASTER_INSTRUCTIONS}
 
-SYLLABUS REQUIREMENTS FOR THIS TOPIC:
+USER LEVEL: {user_level}
+SELECTED TOPIC: {topic}
+
+SYLLABUS LEARNING OUTCOMES FOR THIS TOPIC:
 {topic_outcomes}
 
-RESPONSE REQUIREMENTS:
-1. Directly address the specific learning outcomes above (reference a, b, c, etc.)
-2. Use the Socratic method: ask ONE guiding question at a time
-3. Include LaTeX equations where relevant: $F=ma$ for inline, $$ for block
-4. Reference exam-style examples from the SEAB syllabus
-5. Connect to practical applications mentioned in syllabus
-6. Tailor explanation depth to {user_level} level
+ADDITIONAL REQUIREMENTS:
+1. Directly reference the specific learning outcomes above (a, b, c, etc.)
+2. Tailor all explanations to {user_level} level understanding
+3. Include exam-relevant examples when appropriate
+4. Ensure all explanations align with the SEAB H2 Physics syllabus
 
-FORMAT GUIDELINES:
-- Start by identifying which learning outcome(s) this addresses
-- Explain concepts step-by-step with checks for understanding
-- Use bold for key terms: **momentum**, **energy conservation**
-- Include [IMAGE: diagram query] for diagrams when helpful
-- Suggest related concepts within this topic for further exploration
-
-TEACHING APPROACH:
 {level_instruction_text}"""
-        
-        response_text = ""
-        used_model = "DeepSeek"
+    
+    response_text = ""
+    used_model = "DeepSeek"
 
-        with st.spinner(f"Preparing syllabus-aligned explanation for {topic}..."):
-            try:
-                response_text = call_deepseek(st.session_state.messages, deepseek_key, current_instruction)
-                used_model = "DeepSeek"
-            except Exception as e:
-                st.error(f"DeepSeek API Error: {e}. Please check your API key and internet connection.")
-        
-        if response_text:
-            # Save and Display
-            st.session_state.messages.append({"role": "assistant", "content": response_text})
-            display_message("assistant", response_text, enable_voice)
-        elif not response_text:
-            st.error("❌ API call failed. Please check your key or internet connection.")
+    with st.spinner(f"Preparing syllabus-aligned explanation for {topic}..."):
+        try:
+            response_text = call_deepseek(st.session_state.messages, deepseek_key, current_instruction)
+            used_model = "DeepSeek"
+        except Exception as e:
+            st.error(f"DeepSeek API Error: {e}. Please check your API key and internet connection.")
+    
+    if response_text:
+        # Save and Display
+        st.session_state.messages.append({"role": "assistant", "content": response_text})
+        display_message("assistant", response_text, enable_voice)
+    elif not response_text:
+        st.error("❌ API call failed. Please check your key or internet connection.")
