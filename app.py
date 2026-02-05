@@ -250,62 +250,52 @@ import re
 import json
 
 def parse_quiz_response(response_text):
-    """Parse AI response with robust handling of malformed JSON."""
+    """Parse AI response with robust handling of truncated/malformed JSON."""
     try:
         # Extract JSON array boundaries
         start_idx = response_text.find('[')
         end_idx = response_text.rfind(']')
-        if start_idx == -1 or end_idx == -1:
-            st.error("❌ No JSON array boundaries found")
-            with st.expander("🐞 Raw Response", expanded=True):
-                st.code(response_text[:1000], language="text")
+        if start_idx == -1:
+            st.error("❌ No opening '[' found in response")
+            with st.expander("🐞 Raw Response (First 1500 chars)", expanded=True):
+                st.code(response_text[:1500], language="text")
             return None
         
-        json_str = response_text[start_idx:end_idx + 1].strip()
+        # Handle truncation: if no closing ']', try to reconstruct valid JSON
+        if end_idx == -1:
+            st.warning("⚠️ Response truncated (no closing ']'). Attempting recovery...")
+            json_str = response_text[start_idx:].strip()
+            # Close unclosed structures
+            open_braces = json_str.count('{') - json_str.count('}')
+            open_brackets = json_str.count('[') - json_str.count(']')
+            json_str += '}' * max(0, open_braces) + ']' * max(0, open_brackets)
+        else:
+            json_str = response_text[start_idx:end_idx + 1].strip()
         
-        # Remove markdown wrappers if present
+        # Remove markdown wrappers
         json_str = re.sub(r'^```json\s*', '', json_str)
         json_str = re.sub(r'^```\s*', '', json_str)
         json_str = re.sub(r'\s*```$', '', json_str)
         
-        # Fix 1: Handle unescaped quotes safely using state machine
-        def fix_quotes_safe(s):
-            result, in_str, esc = [], False, False
-            for i, c in enumerate(s):
-                if esc: 
-                    result.append(c); esc = False; continue
-                if c == '\\': 
-                    result.append(c); esc = True; continue
-                if c == '"':
-                    if not in_str: 
-                        in_str = True
-                    else:
-                        # Check if this quote ends the string
-                        next_chars = s[i+1:].lstrip()
-                        if next_chars and next_chars[0] in ',}]:':
-                            in_str = False
-                        else:
-                            result.append('\\')  # Escape internal quote
-                    result.append(c)
-                    continue
-                result.append(c)
-            return ''.join(result)
+        # Fix trailing commas
+        json_str = re.sub(r",\s*([\]}])", r"\1", json_str)
         
-        fixed_json = fix_quotes_safe(json_str)
-        fixed_json = re.sub(r",\s*([\]}])", r"\1", fixed_json)  # Remove trailing commas
+        # Parse
+        questions = json.loads(json_str)
+        if not isinstance(questions, list):
+            questions = [questions]
         
-        # Parse and validate
-        questions = json.loads(fixed_json)
-        if not isinstance(questions, list): questions = [questions]
-        
+        # Validate structure
         validated = []
         for i, q in enumerate(questions):
-            if not isinstance(q, dict): continue
+            if not isinstance(q, dict):
+                st.warning(f"⚠️ Skipping invalid item #{i+1}")
+                continue
             validated.append({
                 'question_number': int(q.get('question_number', i+1)),
                 'question_type': str(q.get('question_type', 'mcq')).lower(),
                 'question': str(q.get('question', f'Question {i+1}')).strip(),
-                'options': [str(o).strip() for o in q.get('options', [])] if isinstance(q.get('options'), list) else [],
+                'options': [str(opt).strip() for opt in q.get('options', [])] if isinstance(q.get('options'), list) else [],
                 'correct_answer': str(q.get('correct_answer', '')).strip(),
                 'explanation': str(q.get('explanation', '')).strip()
             })
@@ -313,10 +303,31 @@ def parse_quiz_response(response_text):
         st.success(f"✅ Parsed {len(validated)} questions")
         return validated
         
+    except json.JSONDecodeError as e:
+        st.error(f"❌ JSON parse error at line {e.lineno}, col {e.colno} (char {e.pos}): {e.msg}")
+        
+        # Show problematic region
+        lines = response_text.split('\n')
+        start_line = max(0, e.lineno - 5)
+        end_line = min(len(lines), e.lineno + 5)
+        snippet = '\n'.join(f"{i+1:3d} | {line}" for i, line in enumerate(lines[start_line:end_line], start=start_line))
+        
+        with st.expander("🐞 Raw Response Near Error", expanded=True):
+            st.subheader(f"Lines {start_line+1}-{end_line}:")
+            st.code(snippet, language="json")
+            st.subheader("First 2000 characters:")
+            st.code(response_text[:2000], language="text")
+            st.caption(f"Total length: {len(response_text)} chars")
+        
+        # Detect truncation patterns
+        if response_text.strip().endswith(('\\fr', '\\frac', '\\Del', '{', '"', '...')):
+            st.warning("🚨 Response TRUNCATED mid-LaTeX/command. Reduce question count!")
+        
+        return None
     except Exception as e:
-        st.error(f"❌ Parse failed: {type(e).__name__} - {str(e)[:100]}")
-        with st.expander("🐞 Debug Raw Response", expanded=True):
-            st.text(response_text[:1200])
+        st.error(f"❌ Unexpected error: {type(e).__name__} - {str(e)[:150]}")
+        with st.expander("🐞 Full Raw Response", expanded=False):
+            st.code(response_text[:2500], language="text")
         return None
         
 def fix_json_string(json_str):
@@ -639,7 +650,7 @@ def call_deepseek(messages, api_key, system_instruction):
         "model": "deepseek-chat",  # You can change this to "deepseek-coder" if needed
         "messages": full_messages,
         "temperature": 0.7,
-        "max_tokens": 4000  # Increased for quiz generation
+        "max_tokens": 4096  # Increased for quiz generation
     }
     
     response = requests.post(url, headers=headers, json=payload, timeout=90)
@@ -716,7 +727,7 @@ with st.sidebar:
         help=QUIZ_LEVELS["Intermediate"]
     )
     
-    num_questions = st.slider("Number of questions:", 5, 30, 10)
+    num_questions = st.slider("Number of questions:", 1, 10, 5)
     
     # --- Button with validation ---
     is_topic_general = (quiz_topic == "General / Any")
