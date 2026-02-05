@@ -250,45 +250,65 @@ import re
 import json
 
 def parse_quiz_response(response_text):
-    """Parse AI response with aggressive cleanup for common JSON issues."""
+    """Parse AI response with robust handling of malformed JSON."""
     try:
         # Extract JSON array boundaries
         start_idx = response_text.find('[')
         end_idx = response_text.rfind(']')
         if start_idx == -1 or end_idx == -1:
-            st.error("❌ No JSON array boundaries found")
-            st.code(response_text[:800], language="text")
+            st.error("❌ No JSON array boundaries found ([ or ]) in response")
+            with st.expander("🐞 Raw Response (First 1000 chars)", expanded=True):
+                st.code(response_text[:1000], language="text")
             return None
         
         json_str = response_text[start_idx:end_idx + 1]
         
-        # DEBUG: Show problematic region near error location
-        if len(json_str) > 250:
-            st.info("🔍 Snippet around char 250-350 (common failure zone):")
-            st.code(json_str[250:350], language="json")
+        # === CRITICAL FIX: Handle unescaped quotes safely ===
+        # Instead of fragile regex, use character-by-character parsing
+        def fix_unescaped_quotes(json_fragment):
+            result = []
+            in_string = False
+            escape_next = False
+            for i, char in enumerate(json_fragment):
+                if escape_next:
+                    result.append(char)
+                    escape_next = False
+                    continue
+                
+                if char == '\\':
+                    result.append(char)
+                    escape_next = True
+                    continue
+                
+                if char == '"':
+                    # Check if this quote is inside a key (before colon) or value (after colon)
+                    # Simple heuristic: if previous non-whitespace char was : or { or , → likely start of value
+                    prev_chars = ''.join(result[-10:]).rstrip()
+                    if not in_string and (prev_chars.endswith(':') or prev_chars.endswith('{') or prev_chars.endswith(',')):
+                        in_string = True
+                        result.append(char)
+                    elif in_string:
+                        # Look ahead: if next non-whitespace is , } ] → this is end of string
+                        next_chars = json_fragment[i+1:i+10].lstrip()
+                        if next_chars.startswith((',', '}', ']')):
+                            in_string = False
+                            result.append(char)
+                        else:
+                            # Likely unescaped quote INSIDE string → escape it
+                            result.append('\\"')
+                    else:
+                        result.append(char)
+                else:
+                    result.append(char)
+            return ''.join(result)
         
-        # FIX 1: Escape unescaped quotes inside string values
-        # Pattern: "key": "value with "broken" quotes"
-        # Strategy: Find quote pairs and escape internal quotes
-        def escape_internal_quotes(match):
-            key = match.group(1)
-            value = match.group(2)
-            # Escape quotes that aren't already escaped and aren't at string boundaries
-            value = re.sub(r'(?<!\\)"', r'\\"', value)
-            return f'"{key}": "{value}"'
-        
-        # Apply to all "key": "value" patterns
-        json_str = re.sub(r'"([^"]+)":\s*"([^"]*)"', escape_internal_quotes, json_str)
-        
-        # FIX 2: Remove trailing commas
-        json_str = re.sub(r",\s*([\]}])", r"\1", json_str)
-        
-        # FIX 3: Replace single quotes for keys/values (risky but sometimes needed)
-        json_str = re.sub(r"'([^']+)':", r'"\1":', json_str)  # keys
-        # Don't blindly replace all single quotes — may break contractions
+        # Apply fixes
+        fixed_json = fix_unescaped_quotes(json_str)
+        fixed_json = re.sub(r",\s*([\]}])", r"\1", fixed_json)  # Remove trailing commas
+        fixed_json = re.sub(r"'([^']+)':", r'"\1":', fixed_json)  # Fix single-quoted keys
         
         # Parse
-        questions = json.loads(json_str)
+        questions = json.loads(fixed_json)
         
         if not isinstance(questions, list):
             questions = [questions]
@@ -310,32 +330,32 @@ def parse_quiz_response(response_text):
             }
             validated.append(validated_q)
         
-        st.success(f"✅ Parsed {len(validated)} questions successfully")
+        st.success(f"✅ Successfully parsed {len(validated)} questions")
         return validated
         
     except json.JSONDecodeError as e:
-        st.error(f"❌ JSON parse error at line {e.lineno}, col {e.colno}: {e.msg}")
+        st.error(f"❌ JSON parse error at line {e.lineno}, col {e.colno} (char {e.pos}): {e.msg}")
         
-        # Show problematic snippet
-        lines = json_str.split('\n')
-        start = max(0, e.lineno - 4)
-        end = min(len(lines), e.lineno + 3)
-        snippet = '\n'.join(f"{i+1:3d} | {line}" for i, line in enumerate(lines[start:end], start=start))
-        st.code(snippet, language="json")
+        # Show RAW input BEFORE any cleanup
+        with st.expander("🐞 RAW INPUT (Before Parsing) - COPY THIS FOR DEBUGGING", expanded=True):
+            st.subheader("Full raw response:")
+            st.text(response_text)
+            st.caption(f"Total length: {len(response_text)} characters")
         
-        # Show raw problematic region by character index
-        char_start = max(0, e.pos - 50)
-        char_end = min(len(json_str), e.pos + 50)
-        st.text("Problem region (chars ±50 around error):")
-        st.code(json_str[char_start:char_end], language="text")
+        # Show problematic region
+        if 'json_str' in locals() and len(json_str) > e.pos:
+            char_start = max(0, e.pos - 80)
+            char_end = min(len(json_str), e.pos + 80)
+            st.subheader(f"Problem region (chars {char_start}-{char_end}):")
+            st.code(json_str[char_start:char_end], language="text")
+            st.caption("💡 Look for unescaped quotes like `\"text\"here\"` or missing commas")
         
-        st.caption("💡 Likely cause: Unescaped quotes in question/option text. Regenerate with stricter prompt.")
         return None
     except Exception as e:
         st.error(f"❌ Unexpected error: {type(e).__name__} - {e}")
-        st.code(json_str[:1000], language="json")
+        import traceback
+        st.code(traceback.format_exc(), language="python")
         return None
-
 def fix_json_string(json_str):
     """Fix common JSON formatting issues."""
     if not json_str:
