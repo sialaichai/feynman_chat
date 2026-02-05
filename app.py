@@ -141,13 +141,12 @@ physics_topics = [
 ]
 
 # ============================================================
-# 3. QUIZ FUNCTIONS - UPDATED WITH ROBUST PARSING
+# 3. QUIZ FUNCTIONS - UPDATED WITHOUT IMAGE REQUIREMENTS
 # ============================================================
 
 def generate_quiz_prompt(difficulty, topic_name, num_questions=20):
     """
-    Generate a VERY STRICT prompt for creating quiz questions.
-    Uses template-based formatting to force valid JSON.
+    Generate a prompt for creating quiz questions WITHOUT image requirements.
     """
     # Create a dictionary mapping topic names to their verbatim learning outcomes
     syllabus_details = {
@@ -195,22 +194,19 @@ def generate_quiz_prompt(difficulty, topic_name, num_questions=20):
     # Get topic-specific guidance
     topic_guidance = syllabus_details.get(topic_name, "Cover key concepts from the official SEAB H2 Physics syllabus.")
 
-    prompt = f"""IMPORTANT: You must follow this EXACT format. Return ONLY the JSON array, nothing else.
-
-Generate exactly {num_questions} H2 Physics questions for topic: {topic_name}
+    prompt = f"""Generate exactly {num_questions} H2 Physics questions for topic: {topic_name}
 Difficulty: {difficulty}
 
 SYLLABUS REQUIREMENTS:
 {topic_guidance}
 
 CRITICAL FORMATTING RULES:
-1. You MUST return a valid JSON array.
+1. Return ONLY a valid JSON array.
 2. Each question MUST follow this EXACT structure:
 {{
   "question_number": 1,
   "question_type": "mcq",
   "question": "Question text with LaTeX like $F=ma$",
-  "diagram_query": "[IMAGE: diagram description]",
   "options": ["Option A", "Option B", "Option C", "Option D"],
   "correct_answer": "Option A",
   "explanation": "Detailed explanation with equations like $F=ma$"
@@ -221,7 +217,6 @@ OR for open-ended:
   "question_number": 2,
   "question_type": "open_ended",
   "question": "Calculate the force...",
-  "diagram_query": "[IMAGE: force diagram]",
   "options": [],
   "correct_answer": "10 N",
   "explanation": "Using $F=ma$..."
@@ -229,30 +224,30 @@ OR for open-ended:
 
 SPECIFIC INSTRUCTIONS:
 1. Mix: 70% MCQ (4 options each), 30% open-ended
-2. EVERY question MUST have a diagram_query starting with [IMAGE: ...]
-3. Use LaTeX for equations: $E=mc^2$ inline, $$ for block
-4. Escape ALL quotes in strings: use backslash like \\"
-5. NO markdown, NO explanations outside JSON
+2. NO image requirements - describe any diagrams in the question text
+3. Use LaTeX for equations: $E=mc^2$ inline
+4. Escape quotes: use backslash like \\" for quotes inside strings
+5. NO additional text outside the JSON array
 6. Number questions from 1 to {num_questions}
 
-EXAMPLE QUESTION (copy this format exactly):
-{{
-  "question_number": 1,
-  "question_type": "mcq",
-  "question": "What is Newton's second law of motion?",
-  "diagram_query": "[IMAGE: free body diagram of forces]",
-  "options": ["F = ma", "F = mg", "v = u + at", "s = ut + ½at²"],
-  "correct_answer": "F = ma",
-  "explanation": "Newton's second law states that force equals mass times acceleration: $F = ma$."
-}}
+EXAMPLE FORMAT:
+[
+  {{
+    "question_number": 1,
+    "question_type": "mcq",
+    "question": "What is Newton's second law?",
+    "options": ["F = ma", "F = mg", "v = u + at", "s = ut + ½at²"],
+    "correct_answer": "F = ma",
+    "explanation": "Newton's second law states: $F = ma$"
+  }}
+]
 
 NOW GENERATE {num_questions} QUESTIONS IN THIS EXACT FORMAT:
 """
     return prompt
 
 def parse_quiz_response(response_text):
-    """Simple but robust JSON parser with error recovery."""
-    
+    """Parse the AI response to extract quiz questions."""
     try:
         # Clean the response
         text = response_text.strip()
@@ -270,19 +265,13 @@ def parse_quiz_response(response_text):
         
         if start_idx == -1 or end_idx == -1:
             st.error("❌ No JSON array found in AI response")
-            st.text("Response preview:")
-            st.text(text[:500])
             return None
         
         # Extract just the JSON
         json_str = text[start_idx:end_idx+1]
         
-        # Fix common issues before parsing
+        # Fix common JSON issues
         json_str = fix_json_string(json_str)
-        
-        # Debug: Show cleaned JSON
-        with st.expander("🔍 Debug: Cleaned JSON"):
-            st.code(json_str[:1000] + "..." if len(json_str) > 1000 else json_str)
         
         # Try to parse
         questions = json.loads(json_str)
@@ -299,7 +288,6 @@ def parse_quiz_response(response_text):
                     'question_number': q.get('question_number', i+1),
                     'question_type': q.get('question_type', 'mcq'),
                     'question': str(q.get('question', f'Question {i+1}')).strip(),
-                    'diagram_query': str(q.get('diagram_query', '')).strip(),
                     'options': q.get('options', []),
                     'correct_answer': str(q.get('correct_answer', '')).strip(),
                     'explanation': str(q.get('explanation', '')).strip()
@@ -311,13 +299,10 @@ def parse_quiz_response(response_text):
                 
                 validated.append(validated_q)
         
-        st.success(f"✅ Successfully parsed {len(validated)} questions")
         return validated
         
     except json.JSONDecodeError as e:
         st.error(f"❌ JSON parse error: {e}")
-        st.text("Raw response (first 1000 chars):")
-        st.text(response_text[:1000])
         return None
     except Exception as e:
         st.error(f"❌ Unexpected error: {e}")
@@ -330,19 +315,35 @@ def fix_json_string(json_str):
     
     # Replace smart quotes with straight quotes
     json_str = json_str.replace('"', '"').replace('"', '"')
-    json_str = json_str.replace("'", "'").replace("'", "'")
     
     # Fix unescaped quotes within strings
     lines = json_str.split('\n')
     fixed_lines = []
     
     for line in lines:
-        # Find and fix unescaped quotes in string values
-        # Pattern: colon, then optional space, then quote, then content, then quote
-        fixed_line = re.sub(r':\s*"([^"\\]*(?:\\.[^"\\]*)*)"', 
-                           lambda m: ': "' + m.group(1).replace('"', '\\"') + '"', 
-                           line)
-        fixed_lines.append(fixed_line)
+        # Simple fix: replace unescaped quotes with escaped ones in string values
+        # This is a simplified version - for production, use a more robust approach
+        if ':' in line and '"' in line:
+            parts = line.split(':', 1)
+            if len(parts) == 2:
+                key_part = parts[0]
+                value_part = parts[1]
+                
+                # Check if value is a string
+                if value_part.strip().startswith('"'):
+                    # Find the closing quote
+                    if value_part.count('"') >= 2:
+                        # Simple fix for common case
+                        value_part = value_part.replace('\\"', '__TEMP__')
+                        value_part = value_part.replace('"', '\\"')
+                        value_part = value_part.replace('__TEMP__', '\\"')
+                        # Remove double escaping
+                        value_part = value_part.replace('\\\\"', '\\"')
+                
+                fixed_lines.append(f'{key_part}:{value_part}')
+                continue
+        
+        fixed_lines.append(line)
     
     return '\n'.join(fixed_lines)
 
@@ -363,15 +364,6 @@ def display_quiz_question(question_data, question_index):
         # Safely get question text
         question_text = question_data.get('question', f'Question {question_index + 1}')
         st.markdown(f"**{question_text}**")
-        
-        # Display diagram if available
-        diagram_query = question_data.get('diagram_query', '')
-        if diagram_query and '[IMAGE:' in diagram_query:
-            image_query = diagram_query.replace('[IMAGE:', '').replace(']', '').strip()
-            if image_query:
-                image_result = search_image(image_query)
-                if image_result and "Error" not in image_result:
-                    st.image(image_result, caption=f"Diagram for Question {question_index + 1}")
         
         # Handle different question types
         if question_data['question_type'] == 'mcq':
@@ -410,14 +402,6 @@ def display_quiz_question(question_data, question_index):
                     with st.expander("View Explanation"):
                         explanation = question_data.get('explanation', 'No explanation provided.')
                         st.markdown(f"**Explanation:** {explanation}")
-                        
-                        # Display additional diagrams if mentioned in explanation
-                        if '[IMAGE:' in explanation:
-                            img_matches = re.findall(r'\[IMAGE:(.*?)\]', explanation)
-                            for img_query in img_matches:
-                                img_result = search_image(img_query.strip())
-                                if img_result and "Error" not in img_result:
-                                    st.image(img_result, caption=f"Explanation Diagram: {img_query}")
         
         elif question_data['question_type'] == 'open_ended':
             # Open-ended question
@@ -680,7 +664,7 @@ with st.sidebar:
     # USER LEVEL SELECTION
     user_level = st.select_slider(
         "Level:", 
-        options=["Beginner", "Intermediate", "Advance"], 
+        options=["Beginner", "Interactive", "Advance"], 
         value="Intermediate"
     )
     
@@ -736,21 +720,14 @@ with st.sidebar:
 1. Return ONLY a valid JSON array. No other text before or after.
 2. Escape ALL quotes inside strings with backslash: \\"
 3. DO NOT use single quotes for JSON strings.
-4. Make sure the JSON is properly formatted with correct commas and brackets.
-5. Ensure every question has ALL required fields: question_number, question_type, question, diagram_query, options, correct_answer, explanation
-6. For MCQ: options must be a list of exactly 4 strings.
-7. For open-ended: options must be an empty list [].
-8. The JSON MUST be parseable by Python's json.loads() function."""
+4. Every question MUST have these fields: question_number, question_type, question, options, correct_answer, explanation
+5. For MCQ: options must be a list of exactly 4 strings.
+6. For open-ended: options must be an empty list [].
+7. NO image requirements - describe any diagrams in the question text.
+8. Use LaTeX for equations: $F=ma$ for inline equations.
+9. The JSON MUST be parseable by Python's json.loads() function."""
 
-                    # Show what we're sending (debug)
-                    with st.expander("📤 Debug: Prompt sent to AI"):
-                        st.code(quiz_prompt[:1000] + "..." if len(quiz_prompt) > 1000 else quiz_prompt)
-                    
                     response = call_deepseek(quiz_messages, deepseek_key, quiz_system_instruction)
-                    
-                    # Show raw response (debug)
-                    with st.expander("📥 Debug: Raw AI Response"):
-                        st.code(response[:2000] + "..." if len(response) > 2000 else response)
                     
                     # Parse the response
                     quiz_questions = parse_quiz_response(response)
@@ -770,15 +747,12 @@ with st.sidebar:
                             st.session_state[f'selected_option_{i}'] = None
                         
                         st.success(f"✅ Generated {len(quiz_questions)} quiz questions!")
-                        st.balloons()
                         st.rerun()
                     else:
                         st.error("Failed to generate quiz questions. Please try again.")
                         
                 except Exception as e:
                     st.error(f"Error generating quiz: {e}")
-                    import traceback
-                    st.code(traceback.format_exc())
     
     # Hint message
     if is_topic_general:
