@@ -768,17 +768,17 @@ def call_deepseek(messages, api_key, system_instruction):
 # ============================================================
 # 8. MAIN APP UI WITH STRICT TOPIC ENFORCEMENT (OPTION 6)
 # ============================================================
-st.title("⚛️ JPJC H2Physics Feynman Bot")
+st.title("⚛️ JPJC H2Physics Bot")
 
 # Sidebar Configuration
 with st.sidebar:
-    st.image("https://upload.wikimedia.org/wikipedia/en/4/42/Richard_Feynman_Nobel.jpg", width=150)
+    #st.image("https://upload.wikimedia.org/wikipedia/en/4/42/Richard_Feynman_Nobel.jpg", width=150)
     
     if st.button("🚪 Logout", use_container_width=True):
         st.session_state.clear()
         st.rerun()
     
-    st.header("⚙️ Configuration")
+    #st.header("⚙️ Configuration")
     
     # DeepSeek API Key only
     deepseek_key = os.environ.get("DEEPSEEK_API_KEY")
