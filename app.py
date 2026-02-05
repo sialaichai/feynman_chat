@@ -514,46 +514,46 @@ def display_quiz_question(question_data, question_index):
                         explanation = question_data.get('explanation', 'No explanation provided.')
                         st.markdown(f"**Explanation:** {explanation}")
         
-elif question_data['question_type'] == 'open_ended':
-    # Open-ended question
-    user_answer = st.text_input(
-        f"Your answer (Question {question_index + 1}):",
-        key=f"open_answer_{question_index}",
-        placeholder="Enter your calculation or explanation..."
-    )
-    
-    if st.button("Submit Answer", key=f"submit_{question_index}"):
-        if user_answer:
-            st.session_state[f'user_answer_{question_index}'] = user_answer
-            st.session_state[f'answered_{question_index}'] = True
-            st.rerun()
-    
-    if st.session_state.get(f'answered_{question_index}', False):
-        # Get answers
-        user_answer = st.session_state.get(f'user_answer_{question_index}', '')
-        correct_answer = question_data.get('correct_answer', 'No correct answer provided.')
-        
-        # 🔑 INTEGRATION POINT: Numerical-aware comparison
-        is_correct, user_display, expected_display = normalize_and_compare_numerical(
-            user_answer, 
-            correct_answer,
-            rel_tol=0.02  # 2% tolerance for physics calculations
-        )
-        
-        # Show feedback with numerical context
-        if is_correct:
-            st.success("✅ Correct!")
-            st.caption(f"Your answer ≈ {user_display} matches expected value {expected_display}")
-        else:
-            st.error("❌ Incorrect")
-            st.caption(f"Your answer: {user_display} | Expected: {expected_display}")
-            # Show helpful hint for common formats
-            st.caption("💡 Acceptable formats: `0.001`, `1e-3`, `1 x 10^-3`, `1×10⁻³`, `1/1000`")
-        
-        # Show explanation
-        with st.expander("View Explanation"):
-            explanation = question_data.get('explanation', 'No explanation provided.')
-            st.markdown(f"**Explanation:** {explanation}")
+                elif question_data['question_type'] == 'open_ended':
+                    # Open-ended question
+                    user_answer = st.text_input(
+                        f"Your answer (Question {question_index + 1}):",
+                        key=f"open_answer_{question_index}",
+                        placeholder="Enter your calculation or explanation..."
+                    )
+                    
+                    if st.button("Submit Answer", key=f"submit_{question_index}"):
+                        if user_answer:
+                            st.session_state[f'user_answer_{question_index}'] = user_answer
+                            st.session_state[f'answered_{question_index}'] = True
+                            st.rerun()
+                    
+                    if st.session_state.get(f'answered_{question_index}', False):
+                        # Get answers
+                        user_answer = st.session_state.get(f'user_answer_{question_index}', '')
+                        correct_answer = question_data.get('correct_answer', 'No correct answer provided.')
+                        
+                        # 🔑 INTEGRATION POINT: Numerical-aware comparison
+                        is_correct, user_display, expected_display = normalize_and_compare_numerical(
+                            user_answer, 
+                            correct_answer,
+                            rel_tol=0.02  # 2% tolerance for physics calculations
+                        )
+                        
+                        # Show feedback with numerical context
+                        if is_correct:
+                            st.success("✅ Correct!")
+                            st.caption(f"Your answer ≈ {user_display} matches expected value {expected_display}")
+                        else:
+                            st.error("❌ Incorrect")
+                            st.caption(f"Your answer: {user_display} | Expected: {expected_display}")
+                            # Show helpful hint for common formats
+                            st.caption("💡 Acceptable formats: `0.001`, `1e-3`, `1 x 10^-3`, `1×10⁻³`, `1/1000`")
+                        
+                        # Show explanation
+                        with st.expander("View Explanation"):
+                            explanation = question_data.get('explanation', 'No explanation provided.')
+                            st.markdown(f"**Explanation:** {explanation}")
         
         else:
             st.error(f"Unknown question type: {question_data['question_type']}")
