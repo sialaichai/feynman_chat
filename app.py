@@ -113,7 +113,7 @@ QUIZ_LEVELS = {
 }
 
 # ============================================================
-# SYLLABUS TOPICS (ADD THIS SECTION)
+# SYLLABUS TOPICS
 # ============================================================
 
 physics_topics = [
@@ -140,16 +140,16 @@ physics_topics = [
     "20. Nuclear Physics"
 ]
 
-
 # ============================================================
-# 3. QUIZ FUNCTIONS
+# 3. QUIZ FUNCTIONS - UPDATED WITH ROBUST PARSING
 # ============================================================
 
 def generate_quiz_prompt(difficulty, topic_name, num_questions=20):
     """
-    Generate a prompt for creating quiz questions, now including SPECIFIC learning outcomes.
+    Generate a VERY STRICT prompt for creating quiz questions.
+    Uses template-based formatting to force valid JSON.
     """
-    # Complete dictionary mapping topic names to their verbatim learning outcomes
+    # Create a dictionary mapping topic names to their verbatim learning outcomes
     syllabus_details = {
         "1. Quantities and Measurement": "Candidates should be able to: (a) recall and use the following SI base quantities and their units: mass (kg), length (m), time (s), current (A), temperature (K), amount of substance (mol); (b) recall and use the following prefixes and their symbols to indicate decimal sub-multiples or multiples of both base and derived units: pico (p), nano (n), micro (μ), milli (m), centi (c), deci (d), kilo (k), mega (M), giga (G), tera (T); (c) express derived units as products or quotients of the SI base units and use the named units listed in 'Summary of Key Quantities, Symbols and Units' as appropriate; (d) use SI base units to check the homogeneity of physical equations; (e) make reasonable estimates of physical quantities included within the syllabus; (f) show an understanding of the distinction between random errors and systematic errors (including zero error) which limit precision and accuracy; (g) assess the uncertainty in derived quantities by adding absolute or relative (i.e. fractional or percentage) uncertainties or by numerical substitution (rigorous statistical treatment is not required); (h) distinguish between scalar and vector quantities, and give examples of each; (i) add and subtract coplanar vectors; (j) represent a vector as two perpendicular components.",
         
@@ -192,198 +192,196 @@ def generate_quiz_prompt(difficulty, topic_name, num_questions=20):
         "20. Nuclear Physics": "Candidates should be able to: (a) infer from the results of the Rutherford \(\alpha\) -particle scattering experiment the existence and small size of the atomic nucleus; (b) distinguish between nucleon number (mass number) and proton number (atomic number); (c) show an understanding that an element can exist in various isotopic forms, each with a different number of neutrons in the nucleus, and use the notation \(\frac{1}{2} X\) for the representation of nuclides; (d) show an understanding of the spontaneous and random nature of nuclear decay; (e) infer the random nature of radioactive decay from the fluctuations in count rate; (f) show an understanding of the origin and significance of background radiation; (g) show an understanding of the nature and properties of \(\alpha\), \(\beta\) and \(\gamma\) radiations (knowledge of positron emission is not required); (h) define the terms activity and decay constant and recall and solve problems using the equation \(A = \lambda N\); (i) infer and sketch the exponential nature of radioactive decay and solve problems using the relationship \(x = x_{0}e^{-\lambda t}\) where \(x\) could represent activity, number of undecayed particles or received count rate; (j) define and use half-life as the time taken for a quantity \(x\) to reduce to half its initial value; (k) solve problems using the relation \(\lambda = \frac{\ln 2}{t_1}\); (l) discuss qualitatively the applications (e.g. medical and industrial uses) and hazards of radioactivity based on: (i) half-life of radioactive materials, (ii) penetrating abilities and ionising effects of radioactive emissions; (m) represent simple nuclear reactions by nuclear equations of the form \(\frac{1}{2} N + \frac{1}{2} He \rightarrow \frac{17}{8} O + \frac{1}{4} H\); (n) state and apply to problem solving the concept that nucleon number, charge and mass- energy are all conserved in nuclear processes; (o) show an understanding of how the conservation laws for energy and momentum in \(\beta\) decay were used to predict the existence of the (anti)neutrino (knowledge of the antineutrino and the zoo of particles is not required); (p) show an understanding of the concept of mass defect; (q) recall and apply the equivalence between energy and mass as represented by \(E = mc^2\) to solve problems; (r) show an understanding of the concept of nuclear binding energy and its relation to mass defect; (s) sketch the variation of binding energy per nucleon with nucleon number; (t) explain the relevance of binding energy per nucleon to nuclear fusion and to nuclear fission."
     }
 
-    # Get the learning outcomes for the selected topic, or a default
-    topic_guidance = syllabus_details.get(topic_name, "Cover key concepts from the official SEAB H2 Physics syllabus for this topic.")
+    # Get topic-specific guidance
+    topic_guidance = syllabus_details.get(topic_name, "Cover key concepts from the official SEAB H2 Physics syllabus.")
 
-    prompt = f"""
-    Generate {num_questions} H2 Physics quiz questions strictly for the syllabus topic: {topic_name}
-    Difficulty Level: {difficulty}
+    prompt = f"""IMPORTANT: You must follow this EXACT format. Return ONLY the JSON array, nothing else.
 
-    TOPIC-SPECIFIC GUIDELINES:
-    {topic_guidance}
-    The questions must test these specific learning outcomes.
+Generate exactly {num_questions} H2 Physics questions for topic: {topic_name}
+Difficulty: {difficulty}
 
-    [REST OF YOUR EXISTING PROMPT FORMATTING RULES HERE - keep the JSON structure, diagram requirements, etc.]
-    """
+SYLLABUS REQUIREMENTS:
+{topic_guidance}
+
+CRITICAL FORMATTING RULES:
+1. You MUST return a valid JSON array.
+2. Each question MUST follow this EXACT structure:
+{{
+  "question_number": 1,
+  "question_type": "mcq",
+  "question": "Question text with LaTeX like $F=ma$",
+  "diagram_query": "[IMAGE: diagram description]",
+  "options": ["Option A", "Option B", "Option C", "Option D"],
+  "correct_answer": "Option A",
+  "explanation": "Detailed explanation with equations like $F=ma$"
+}}
+
+OR for open-ended:
+{{
+  "question_number": 2,
+  "question_type": "open_ended",
+  "question": "Calculate the force...",
+  "diagram_query": "[IMAGE: force diagram]",
+  "options": [],
+  "correct_answer": "10 N",
+  "explanation": "Using $F=ma$..."
+}}
+
+SPECIFIC INSTRUCTIONS:
+1. Mix: 70% MCQ (4 options each), 30% open-ended
+2. EVERY question MUST have a diagram_query starting with [IMAGE: ...]
+3. Use LaTeX for equations: $E=mc^2$ inline, $$ for block
+4. Escape ALL quotes in strings: use backslash like \\"
+5. NO markdown, NO explanations outside JSON
+6. Number questions from 1 to {num_questions}
+
+EXAMPLE QUESTION (copy this format exactly):
+{{
+  "question_number": 1,
+  "question_type": "mcq",
+  "question": "What is Newton's second law of motion?",
+  "diagram_query": "[IMAGE: free body diagram of forces]",
+  "options": ["F = ma", "F = mg", "v = u + at", "s = ut + ½at²"],
+  "correct_answer": "F = ma",
+  "explanation": "Newton's second law states that force equals mass times acceleration: $F = ma$."
+}}
+
+NOW GENERATE {num_questions} QUESTIONS IN THIS EXACT FORMAT:
+"""
     return prompt
 
 def parse_quiz_response(response_text):
-    """Parse the AI response to extract quiz questions with robust error handling."""
+    """Simple but robust JSON parser with error recovery."""
+    
     try:
-        # Debug: Log first 200 chars of response
-        print(f"DEBUG: Response preview: {response_text[:200]}...")
+        # Clean the response
+        text = response_text.strip()
         
-        # 1. Clean the response text thoroughly
         # Remove markdown code blocks
-        clean_text = response_text.replace('```json', '').replace('```', '').strip()
+        if '```json' in text:
+            text = text.split('```json')[1]
+        if '```' in text:
+            text = text.split('```')[0]
+        text = text.strip()
         
-        # 2. Try to extract JSON array with multiple patterns
-        json_str = None
-        patterns = [
-            r'\[\s*\{.*?\}\s*\]',  # Standard JSON array
-            r'\{.*?\}',  # Single object (wrap in array)
-        ]
+        # Find JSON array boundaries
+        start_idx = text.find('[')
+        end_idx = text.rfind(']')
         
-        for pattern in patterns:
-            match = re.search(pattern, clean_text, re.DOTALL)
-            if match:
-                json_str = match.group()
-                break
-        
-        if not json_str:
-            # If no pattern matches, try the entire cleaned text
-            json_str = clean_text
-        
-        # 3. Fix common JSON issues
-        # Replace smart quotes with straight quotes
-        json_str = json_str.replace('"', '"').replace('"', '"')
-        json_str = json_str.replace("'", "'").replace("'", "'")
-        
-        # Escape unescaped quotes inside strings
-        # Pattern: find quotes that are not preceded by backslash but are inside a string value
-        def escape_quotes_in_strings(match):
-            # For values like: "question": "He said "hello" to me"
-            # We need to escape the inner quotes
-            text = match.group(0)
-            # Escape quotes that aren't already escaped
-            text = re.sub(r'(?<!\\)"', r'\"', text)
-            return text
-        
-        # Apply to all string values in the JSON
-        json_str = re.sub(r':\s*"[^"]*"', escape_quotes_in_strings, json_str)
-        
-        # 4. Try parsing with increasing leniency
-        questions = None
-        
-        # First try: standard JSON parsing
-        try:
-            questions = json.loads(json_str)
-        except json.JSONDecodeError as e1:
-            st.warning(f"First JSON parse failed: {e1}. Trying to fix common issues...")
-            
-            # Second try: fix trailing commas
-            json_str_fixed = re.sub(r',\s*}', '}', json_str)
-            json_str_fixed = re.sub(r',\s*\]', ']', json_str_fixed)
-            
-            try:
-                questions = json.loads(json_str_fixed)
-            except json.JSONDecodeError as e2:
-                st.warning(f"Second JSON parse failed: {e2}. Trying as single object...")
-                
-                # Third try: if it's a single object, wrap in array
-                if json_str_fixed.startswith('{') and json_str_fixed.endswith('}'):
-                    questions = [json.loads(json_str_fixed)]
-                else:
-                    # Last resort: manual extraction
-                    st.error("JSON parsing failed completely. Attempting manual extraction...")
-                    questions = extract_questions_manually(json_str_fixed)
-        
-        if not questions:
-            st.error("Could not parse any questions from the response.")
+        if start_idx == -1 or end_idx == -1:
+            st.error("❌ No JSON array found in AI response")
+            st.text("Response preview:")
+            st.text(text[:500])
             return None
         
-        # 5. Ensure we have a list
-        if isinstance(questions, dict):
+        # Extract just the JSON
+        json_str = text[start_idx:end_idx+1]
+        
+        # Fix common issues before parsing
+        json_str = fix_json_string(json_str)
+        
+        # Debug: Show cleaned JSON
+        with st.expander("🔍 Debug: Cleaned JSON"):
+            st.code(json_str[:1000] + "..." if len(json_str) > 1000 else json_str)
+        
+        # Try to parse
+        questions = json.loads(json_str)
+        
+        if not isinstance(questions, list):
             questions = [questions]
         
-        # 6. Validate and clean each question
-        valid_questions = []
+        # Validate and clean each question
+        validated = []
         for i, q in enumerate(questions):
-            if not isinstance(q, dict):
-                st.warning(f"Question {i} is not a dictionary, skipping")
-                continue
-            
-            # Clean string values
-            cleaned_q = {}
-            for key, value in q.items():
-                if isinstance(value, str):
-                    # Remove common formatting issues
-                    cleaned_value = value.strip()
-                    # Remove any remaining unescaped quotes
-                    cleaned_value = cleaned_value.replace('\n', ' ').replace('\r', '')
-                    cleaned_q[key] = cleaned_value
-                else:
-                    cleaned_q[key] = value
-            
-            # Ensure required fields with defaults
-            cleaned_q.setdefault('question_number', i + 1)
-            cleaned_q.setdefault('question_type', 'mcq')
-            cleaned_q.setdefault('question', f'Question {i + 1}')
-            cleaned_q.setdefault('diagram_query', '')
-            cleaned_q.setdefault('options', [])
-            cleaned_q.setdefault('correct_answer', '')
-            cleaned_q.setdefault('explanation', '')
-            
-            # If options is a string, try to parse it
-            if isinstance(cleaned_q['options'], str):
-                try:
-                    cleaned_q['options'] = json.loads(cleaned_q['options'])
-                except:
-                    # If it's not valid JSON, split by common delimiters
-                    options_str = cleaned_q['options']
-                    if ';' in options_str:
-                        cleaned_q['options'] = [opt.strip() for opt in options_str.split(';') if opt.strip()]
-                    elif ',' in options_str:
-                        cleaned_q['options'] = [opt.strip() for opt in options_str.split(',') if opt.strip()]
-                    else:
-                        cleaned_q['options'] = [options_str]
-            
-            valid_questions.append(cleaned_q)
+            if isinstance(q, dict):
+                # Ensure all required keys exist with defaults
+                validated_q = {
+                    'question_number': q.get('question_number', i+1),
+                    'question_type': q.get('question_type', 'mcq'),
+                    'question': str(q.get('question', f'Question {i+1}')).strip(),
+                    'diagram_query': str(q.get('diagram_query', '')).strip(),
+                    'options': q.get('options', []),
+                    'correct_answer': str(q.get('correct_answer', '')).strip(),
+                    'explanation': str(q.get('explanation', '')).strip()
+                }
+                
+                # Ensure options is a list
+                if not isinstance(validated_q['options'], list):
+                    validated_q['options'] = []
+                
+                validated.append(validated_q)
         
-        st.success(f"Successfully parsed {len(valid_questions)} questions")
-        return valid_questions
+        st.success(f"✅ Successfully parsed {len(validated)} questions")
+        return validated
         
-    except Exception as e:
-        st.error(f"Critical error in parse_quiz_response: {e}")
-        st.text("Failed response (first 1000 chars):")
+    except json.JSONDecodeError as e:
+        st.error(f"❌ JSON parse error: {e}")
+        st.text("Raw response (first 1000 chars):")
         st.text(response_text[:1000])
-        import traceback
-        st.text(f"Traceback: {traceback.format_exc()}")
+        return None
+    except Exception as e:
+        st.error(f"❌ Unexpected error: {e}")
         return None
 
-def extract_questions_manually(text):
-    """Fallback method to extract questions from malformed text."""
-    questions = []
+def fix_json_string(json_str):
+    """Fix common JSON formatting issues."""
+    if not json_str:
+        return json_str
     
-    # Look for question-like patterns
-    question_patterns = [
-        r'"question"\s*:\s*"([^"]*)"',
-        r'"question"\s*:\s*\'([^\']*)\'',
-    ]
+    # Replace smart quotes with straight quotes
+    json_str = json_str.replace('"', '"').replace('"', '"')
+    json_str = json_str.replace("'", "'").replace("'", "'")
     
-    for pattern in question_patterns:
-        matches = re.findall(pattern, text)
-        for match in matches:
-            questions.append({
-                'question': match,
-                'question_type': 'mcq',
-                'options': [],
-                'correct_answer': '',
-                'explanation': ''
-            })
+    # Fix unescaped quotes within strings
+    lines = json_str.split('\n')
+    fixed_lines = []
     
-    return questions
+    for line in lines:
+        # Find and fix unescaped quotes in string values
+        # Pattern: colon, then optional space, then quote, then content, then quote
+        fixed_line = re.sub(r':\s*"([^"\\]*(?:\\.[^"\\]*)*)"', 
+                           lambda m: ': "' + m.group(1).replace('"', '\\"') + '"', 
+                           line)
+        fixed_lines.append(fixed_line)
+    
+    return '\n'.join(fixed_lines)
 
 def display_quiz_question(question_data, question_index):
     """Display a single quiz question with its components."""
+    
+    # DEFENSIVE CHECK: Ensure required keys exist
+    if 'question_type' not in question_data:
+        st.error(f"Question {question_index + 1} has invalid format (missing question_type).")
+        return
+    
     with st.container():
         st.markdown(f'<div class="quiz-question">', unsafe_allow_html=True)
         
         # Display question number and text
         st.subheader(f"Question {question_index + 1} of {len(st.session_state.quiz_questions)}")
-        st.markdown(f"**{question_data['question']}**")
+        
+        # Safely get question text
+        question_text = question_data.get('question', f'Question {question_index + 1}')
+        st.markdown(f"**{question_text}**")
         
         # Display diagram if available
-        if 'diagram_query' in question_data and question_data['diagram_query']:
-            image_query = question_data['diagram_query'].replace('[IMAGE:', '').replace(']', '').strip()
-            image_result = search_image(image_query)
-            if image_result and "Error" not in image_result:
-                st.image(image_result, caption=f"Diagram for Question {question_index + 1}")
+        diagram_query = question_data.get('diagram_query', '')
+        if diagram_query and '[IMAGE:' in diagram_query:
+            image_query = diagram_query.replace('[IMAGE:', '').replace(']', '').strip()
+            if image_query:
+                image_result = search_image(image_query)
+                if image_result and "Error" not in image_result:
+                    st.image(image_result, caption=f"Diagram for Question {question_index + 1}")
         
         # Handle different question types
         if question_data['question_type'] == 'mcq':
-            # Display MCQ options
+            # Get options safely
             options = question_data.get('options', [])
+            if not options or len(options) == 0:
+                st.warning("This MCQ has no options.")
+                options = ["Option A", "Option B", "Option C", "Option D"]
+            
+            # Display MCQ options
             selected_option = st.session_state.get(f'selected_option_{question_index}', None)
             
             for i, option in enumerate(options):
@@ -396,7 +394,7 @@ def display_quiz_question(question_data, question_index):
             # Check answer button
             if selected_option is not None:
                 user_answer = options[selected_option]
-                correct_answer = question_data['correct_answer']
+                correct_answer = question_data.get('correct_answer', '')
                 
                 if st.button("Check Answer", key=f"check_{question_index}", type="primary"):
                     st.session_state[f'answered_{question_index}'] = True
@@ -410,17 +408,19 @@ def display_quiz_question(question_data, question_index):
                     
                     # Show explanation
                     with st.expander("View Explanation"):
-                        st.markdown(f"**Explanation:** {question_data['explanation']}")
+                        explanation = question_data.get('explanation', 'No explanation provided.')
+                        st.markdown(f"**Explanation:** {explanation}")
                         
                         # Display additional diagrams if mentioned in explanation
-                        if '[IMAGE:' in question_data['explanation']:
-                            img_matches = re.findall(r'\[IMAGE:(.*?)\]', question_data['explanation'])
+                        if '[IMAGE:' in explanation:
+                            img_matches = re.findall(r'\[IMAGE:(.*?)\]', explanation)
                             for img_query in img_matches:
                                 img_result = search_image(img_query.strip())
                                 if img_result and "Error" not in img_result:
                                     st.image(img_result, caption=f"Explanation Diagram: {img_query}")
         
-        else:  # open_ended question
+        elif question_data['question_type'] == 'open_ended':
+            # Open-ended question
             user_answer = st.text_input(
                 f"Your answer (Question {question_index + 1}):",
                 key=f"open_answer_{question_index}",
@@ -435,10 +435,15 @@ def display_quiz_question(question_data, question_index):
             
             if st.session_state.get(f'answered_{question_index}', False):
                 st.info(f"**Your answer:** {user_answer}")
-                st.success(f"**Correct answer:** {question_data['correct_answer']}")
+                correct_answer = question_data.get('correct_answer', 'No correct answer provided.')
+                st.success(f"**Correct answer:** {correct_answer}")
                 
                 with st.expander("View Explanation"):
-                    st.markdown(f"**Explanation:** {question_data['explanation']}")
+                    explanation = question_data.get('explanation', 'No explanation provided.')
+                    st.markdown(f"**Explanation:** {explanation}")
+        
+        else:
+            st.error(f"Unknown question type: {question_data['question_type']}")
         
         st.markdown('</div>', unsafe_allow_html=True)
         
@@ -460,7 +465,7 @@ def display_quiz_question(question_data, question_index):
         st.caption(f"Progress: {question_index + 1}/{len(st.session_state.quiz_questions)}")
 
 # ============================================================
-# 3. AUTHENTICATION
+# 4. AUTHENTICATION
 # ============================================================
 def check_login():
     """Check if user is logged in."""
@@ -495,7 +500,7 @@ if not check_login():
     st.stop()
 
 # ============================================================
-# 4. HELPER FUNCTIONS
+# 5. HELPER FUNCTIONS
 # ============================================================
 @st.cache_data(show_spinner=False)
 def generate_audio(text):
@@ -625,7 +630,7 @@ def display_message(role, content, enable_voice=False):
                 st.audio(audio_bytes, format='audio/mp3')
 
 # ============================================================
-# 5. DEEPSEEK API CALL
+# 6. DEEPSEEK API CALL
 # ============================================================
 
 def call_deepseek(messages, api_key, system_instruction):
@@ -648,7 +653,7 @@ def call_deepseek(messages, api_key, system_instruction):
     return response.json()["choices"][0]["message"]["content"]
 
 # ============================================================
-# 6. MAIN APP UI
+# 7. MAIN APP UI
 # ============================================================
 st.title("⚛️ JPJC H2Physics Feynman Bot")
 
@@ -670,13 +675,7 @@ with st.sidebar:
     
     st.divider()
     
-    topic = st.selectbox("Topic:", [
-        "General / Any", "1. Quantities and Measurement", "2. Forces and Moments", 
-        "3. Motion and Forces", "4. Energy and Fields", "5. Projectile Motion", "6. Collisions", "7. Circular Motion", 
-        "8. Gravitational Fields", "9. Oscillations", "10. Wave Motion", "11. Superposition",  "12. Temperature and Ideal Gases", "13. Thermodynamic Systems", 
-        "14. Electric Fields", "15. Currents", "16. Circuits",  "17. Electromagnetic Forces", "18. Electromagnetic Induction", 
-        "19. Quantum Physics","20. Nuclear Physics"
-    ])
+    topic = st.selectbox("Topic:", physics_topics)
     
     # USER LEVEL SELECTION
     user_level = st.select_slider(
@@ -693,7 +692,7 @@ with st.sidebar:
     # QUIZ SECTION
     # ============================================
     st.header("📝 Quiz Generator")
-
+    
     quiz_topic = st.selectbox(
         "Quiz Topic:",
         physics_topics,
@@ -707,26 +706,24 @@ with st.sidebar:
         help=QUIZ_LEVELS["Intermediate"]
     )
     
-    num_questions = st.slider("Number of questions:", 5, 30, 20)
+    num_questions = st.slider("Number of questions:", 5, 30, 10)
     
-    if st.button("🎯 Generate Quiz", type="primary", use_container_width=True):
+    # --- Button with validation ---
+    is_topic_general = (quiz_topic == "General / Any")
+    
+    if st.button("🎯 Generate Quiz", 
+                 type="primary", 
+                 use_container_width=True,
+                 disabled=is_topic_general or not deepseek_key):
+        
         if not deepseek_key:
             st.error("⚠️ Please provide a DeepSeek API Key first.")
-
-        # --- NEW VALIDATION STARTS HERE ---
-        elif quiz_topic == "General / Any":
-            # Display a warning and stop the process
-            st.warning("🚨 Please select a specific topic from the 'Quiz Topic' dropdown to generate a quiz.")
-            st.stop()  # This halts further execution for this button click
-        # --- NEW VALIDATION ENDS HERE ---
-
-      
         else:
             # Generate quiz prompt
-            quiz_prompt = generate_quiz_prompt(quiz_difficulty, topic, num_questions)
+            quiz_prompt = generate_quiz_prompt(quiz_difficulty, quiz_topic, num_questions)
             
             # Call DeepSeek to generate quiz
-            with st.spinner(f"Generating {num_questions} {quiz_difficulty} quiz questions..."):
+            with st.spinner(f"Generating {num_questions} {quiz_difficulty} quiz questions for {quiz_topic}..."):
                 try:
                     # Prepare messages for quiz generation
                     quiz_messages = [
@@ -734,15 +731,26 @@ with st.sidebar:
                     ]
                     
                     # System instruction for quiz generation
-                    quiz_system_instruction = f"""
-                    You are an expert H2 Physics quiz generator. Generate quiz questions strictly following the SEAB H2 Physics syllabus.
-                    Difficulty: {quiz_difficulty}
-                    Topic: {topic}
-                    
-                    IMPORTANT: Return ONLY a valid JSON array of quiz questions. No additional text or explanations.
-                    """
+                    quiz_system_instruction = """You are generating a H2 Physics quiz. You MUST follow these rules EXACTLY:
+
+1. Return ONLY a valid JSON array. No other text before or after.
+2. Escape ALL quotes inside strings with backslash: \\"
+3. DO NOT use single quotes for JSON strings.
+4. Make sure the JSON is properly formatted with correct commas and brackets.
+5. Ensure every question has ALL required fields: question_number, question_type, question, diagram_query, options, correct_answer, explanation
+6. For MCQ: options must be a list of exactly 4 strings.
+7. For open-ended: options must be an empty list [].
+8. The JSON MUST be parseable by Python's json.loads() function."""
+
+                    # Show what we're sending (debug)
+                    with st.expander("📤 Debug: Prompt sent to AI"):
+                        st.code(quiz_prompt[:1000] + "..." if len(quiz_prompt) > 1000 else quiz_prompt)
                     
                     response = call_deepseek(quiz_messages, deepseek_key, quiz_system_instruction)
+                    
+                    # Show raw response (debug)
+                    with st.expander("📥 Debug: Raw AI Response"):
+                        st.code(response[:2000] + "..." if len(response) > 2000 else response)
                     
                     # Parse the response
                     quiz_questions = parse_quiz_response(response)
@@ -762,12 +770,19 @@ with st.sidebar:
                             st.session_state[f'selected_option_{i}'] = None
                         
                         st.success(f"✅ Generated {len(quiz_questions)} quiz questions!")
+                        st.balloons()
                         st.rerun()
                     else:
                         st.error("Failed to generate quiz questions. Please try again.")
                         
                 except Exception as e:
                     st.error(f"Error generating quiz: {e}")
+                    import traceback
+                    st.code(traceback.format_exc())
+    
+    # Hint message
+    if is_topic_general:
+        st.info("🔍 Select a specific topic above to generate a targeted quiz.")
     
     if st.button("🧹 Clear Quiz", use_container_width=True):
         if 'quiz_questions' in st.session_state:
@@ -785,7 +800,7 @@ with st.sidebar:
 # Main content area
 if 'quiz_active' in st.session_state and st.session_state.quiz_active:
     # Display quiz interface
-    st.header(f"📝 {topic} Quiz - {quiz_difficulty} Level")
+    st.header(f"📝 {quiz_topic} Quiz - {quiz_difficulty} Level")
     
     if 'quiz_questions' in st.session_state:
         current_q = st.session_state.current_question
