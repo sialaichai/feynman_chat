@@ -786,7 +786,7 @@ with st.sidebar:
         deepseek_key = st.text_input("DeepSeek API Key:", type="password", 
                                     help="Get your API key from https://platform.deepseek.com/api_keys")
     
-    st.divider()
+    #st.divider()
     
     # TOPIC SELECTION WITH ENFORCEMENT
     topic = st.selectbox(
@@ -1005,6 +1005,7 @@ else:
 1. **Select a specific topic** from the sidebar (not 'General / Any')
 2. Choose your learning level (Beginner/Intermediate/Advanced)
 3. Ask your physics question!
+4. Generate Quiz to check your understanding.
 
 Ready to explore physics? Select a topic above! ⚛️"""
         }]
@@ -1017,13 +1018,7 @@ Ready to explore physics? Select a topic above! ⚛️"""
     if topic == "General / Any":
         st.info("""
         **📚 Syllabus-Aligned Learning Required**
-        
-        To get accurate, exam-relevant explanations:
-        1. **Select a specific topic** from the sidebar (not 'General / Any')
-        2. Choose your difficulty level
-        3. Ask your question
-        
-        Each topic includes specific SEAB learning outcomes that I'll reference in my explanations.
+        **Select a specific topic** from the sidebar (not 'General / Any')
         """)
 
     # User Input - DISABLED when no topic selected
