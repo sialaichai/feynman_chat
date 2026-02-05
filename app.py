@@ -211,18 +211,49 @@ def parse_quiz_response(response_text):
     """Parse the AI response to extract quiz questions."""
     try:
         # Try to find JSON array in the response
-        json_match = re.search(r'\[\s*\{.*\}\s*\]', response_text, re.DOTALL)
+        json_match = re.search(r'\[\s*\{.*?\}\s*\]', response_text, re.DOTALL)
         if json_match:
-            questions = json.loads(json_match.group())
-            return questions
+            json_str = json_match.group()
         else:
-            # Try to parse the entire response if it looks like JSON
-            try:
-                questions = json.loads(response_text)
-                return questions
-            except:
-                st.error("Could not parse quiz questions from response.")
-                return None
+            # If no array found, try to parse the entire response
+            json_str = response_text.strip()
+        
+        # Clean the JSON string
+        json_str = json_str.replace('```json', '').replace('```', '').strip()
+        
+        # Parse JSON
+        questions = json.loads(json_str)
+        
+        # Validate each question has required fields
+        valid_questions = []
+        for i, q in enumerate(questions):
+            if not isinstance(q, dict):
+                st.warning(f"Question {i} is not a dictionary, skipping")
+                continue
+                
+            if 'question_type' not in q:
+                st.warning(f"Question {i} missing 'question_type', setting to 'mcq'")
+                q['question_type'] = 'mcq'
+            
+            if 'options' not in q and q.get('question_type') == 'mcq':
+                st.warning(f"MCQ question {i} missing 'options', setting empty list")
+                q['options'] = []
+            
+            # Ensure all required keys exist with defaults
+            q.setdefault('question', f"Question {i+1}")
+            q.setdefault('diagram_query', '')
+            q.setdefault('correct_answer', '')
+            q.setdefault('explanation', '')
+            
+            valid_questions.append(q)
+        
+        return valid_questions
+        
+    except json.JSONDecodeError as e:
+        st.error(f"Failed to parse JSON: {e}")
+        st.text("Raw response preview:")
+        st.text(response_text[:500] + "..." if len(response_text) > 500 else response_text)
+        return None
     except Exception as e:
         st.error(f"Error parsing quiz: {e}")
         return None
