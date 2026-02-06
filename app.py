@@ -723,12 +723,13 @@ def execute_plotting_code(code_snippet):
 def fix_latex(text):
     """
     Repair LaTeX formatting issues from DeepSeek output.
-    Handles: missing backslashes, Unicode symbols, delimiter errors, and spacing.
+    Handles: missing backslashes, Unicode symbols, delimiter errors, spacing.
+    Python 3.13 safe — no backslashes in replacement strings.
     """
     if not isinstance(text, str):
         return text
     
-    # Phase 1: Fix Unicode characters → LaTeX equivalents
+    # Phase 1: Fix Unicode characters → LaTeX equivalents (simple string replace)
     unicode_fixes = {
         'ω': '\\omega ', 'Ω': '\\Omega ', 'α': '\\alpha ', 'β': '\\beta ',
         'γ': '\\gamma ', 'δ': '\\delta ', 'ε': '\\epsilon ', 'θ': '\\theta ',
@@ -741,47 +742,51 @@ def fix_latex(text):
     for uni, replacement in unicode_fixes.items():
         text = text.replace(uni, replacement)
     
-    # Phase 2: Convert ( \omega ) patterns → $\\omega$
+    # Phase 2: Convert ( omega ) patterns → $\\omega$ using safe lambda
     import re
-    text = re.sub(
-        r'\(\s*\\?([a-zA-Z]+(?:\{[^}]*\})?)\s*\)',
-        lambda m: f"${fix_greek_in_match(m.group(1))}$",
-        text
-    )
+    def fix_parens(match):
+        word = match.group(1).strip()
+        # Add backslash if missing
+        if not word.startswith('\\'):
+            word = '\\' + word
+        return f'${word}$'
     
-    # Phase 3: Restore missing backslashes for Greek/trig commands
+    text = re.sub(r'\(\s*([a-zA-Z]+(?:\{[^}]*\})?)\s*\)', fix_parens, text)
+    
+    # Phase 3: Restore missing backslashes BEFORE Greek/trig commands
+    # SAFE METHOD: Use lambda to avoid backslashes in replacement string
     greek_and_commands = [
         'alpha', 'beta', 'gamma', 'delta', 'epsilon', 'theta', 'lambda', 'mu',
         'pi', 'sigma', 'tau', 'phi', 'psi', 'omega',
         'frac', 'sqrt', 'sin', 'cos', 'tan', 'log', 'ln', 'exp', 'vec',
         'cdot', 'Delta', 'partial', 'infty'
     ]
-    for cmd in greek_and_commands:
-        # Only add backslash if not already present and not part of a word
-        text = re.sub(r'(?<!\\)\b' + cmd + r'\b', '\\' + cmd, text)
     
-    # Phase 4: FIX DELIMITER ARTIFACTS ($$$$ → $$ with newline)
-    # Replace 4+ dollar signs with display math + newline for visual separation
-    text = re.sub(r'\${4,}', '\n$$\n', text)
-    # Replace 3 dollar signs with single $ (rare edge case)
-    text = re.sub(r'\${3}', '$', text)
-    # Collapse double $$ at line boundaries
-    text = re.sub(r'\$\$\s*\$\$', '\n$$\n', text)
+    for cmd in greek_and_commands:
+        # Pattern: word boundary, NOT preceded by backslash, followed by word boundary
+        pattern = r'(?<!\\)\b' + cmd + r'\b'
+        # Use lambda to safely insert backslash
+        text = re.sub(pattern, lambda m: '\\' + m.group(0), text)
+    
+    # Phase 4: FIX DELIMITER ARTIFACTS ($$$$ → clean display math)
+    text = re.sub(r'\${6,}', '\n$$\n', text)  # 6+ dollars → display block
+    text = re.sub(r'\${4,5}', '\n$$\n', text)  # 4-5 dollars → display block
+    text = re.sub(r'\${3}', '$', text)         # 3 dollars → inline
     
     # Phase 5: Add spacing around inline math for readability
     text = re.sub(r'([a-zA-Z])\$', r'\1 $', text)  # Space before $
     text = re.sub(r'\$([a-zA-Z])', r'$ \1', text)  # Space after $
     
-    # Phase 6: Add spacing around operators (safe replacements without backslashes)
+    # Phase 6: Add spacing around operators (safe string replaces)
     text = text.replace('\\cdot', ' \\cdot ')
     text = text.replace('\\times', ' \\times ')
     text = re.sub(r'\s*=\s*', ' = ', text)
     
-    # Cleanup: collapse multiple spaces
-    text = re.sub(r' +', ' ', text)
+    # Cleanup: collapse multiple spaces and newlines
+    text = re.sub(r' {2,}', ' ', text)
+    text = re.sub(r'\n{3,}', '\n\n', text)
     
     return text
-
 def fix_greek_in_match(word):
     """Helper: Add backslash to Greek letters inside (...) patterns."""
     greek = ['alpha','beta','gamma','delta','epsilon','theta','lambda','mu',
