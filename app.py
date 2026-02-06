@@ -787,12 +787,15 @@ def fix_latex(text):
     text = re.sub(r'(?<=[a-z])\$', ' $', text)    # Lowercase adjacency
     text = re.sub(r'\$(?=[a-z])', '$ ', text)
     
-    # Phase 10: Add spacing around binary operators for readability
-    # \cdot, \times, +, - (when not unary), =, \approx
+    # Phase 10: Add spacing around binary operators using CAPTURE GROUPS (avoids backslash errors)
+    # \cdot → " \cdot "
+    text = re.sub(r'(\\cdot)', r' \1 ', text)
+    # \times → " \times "
+    text = re.sub(r'(\\times)', r' \1 ', text)
+    # + and - operators (not unary)
     text = re.sub(r'(?<![a-zA-Z\\])\+(?![a-zA-Z])', ' + ', text)
-    text = re.sub(r'(?<![a-zA-Z\\])-(?![a-zA-Z0-9])', ' - ', text)  # Not unary minus
-    text = re.sub(r'\\cdot', ' \\cdot ', text)
-    text = re.sub(r'\\times', ' \\times ', text)
+    text = re.sub(r'(?<![a-zA-Z\\])-(?![a-zA-Z0-9])', ' - ', text)
+    # = operator
     text = re.sub(r'\s*=\s*', ' = ', text)
     
     # Cleanup: collapse multiple spaces
@@ -808,6 +811,8 @@ def fix_greek_in_match(word):
         if not word.startswith('\\'):
             return '\\' + word
     return word
+
+
 def display_message(role, content, enable_voice=False):
     with st.chat_message(role):
         # 1. Extract Python Code
