@@ -11,69 +11,9 @@ from gtts import gTTS
 from duckduckgo_search import DDGS
 import re
 import math
-
 import re
 
-def fix_chat_latex(text):
-    """
-    Fix common LaTeX issues in DeepSeek chat responses before rendering.
-    Handles missing backslashes, Unicode characters, and broken formatting.
-    """
-    if not isinstance(text, str):
-        return text
-    
-    # Phase 1: Fix Unicode characters → ASCII/LaTeX equivalents
-    unicode_fixes = {
-        '−': '-',      # Unicode minus → ASCII hyphen-minus
-        '–': '-',      # En dash
-        '—': '-',      # Em dash
-        '×': '\\times ',  # Multiplication sign
-        '·': '\\cdot ',   # Middle dot
-        '²': '^2',     # Superscript 2
-        '³': '^3',     # Superscript 3
-        '¹': '^1',
-        '⁰': '^0',
-        '⁻': '^-',     # Superscript minus
-        'Ω': '\\Omega ',
-    }
-    for uni, replacement in unicode_fixes.items():
-        text = text.replace(uni, replacement)
-    
-    # Phase 2: Restore missing backslashes before Greek letters & commands
-    # Only add backslash if NOT already escaped and NOT part of a word
-    greek_letters = [
-        'alpha', 'beta', 'gamma', 'delta', 'epsilon', 'zeta', 'eta', 'theta',
-        'iota', 'kappa', 'lambda', 'mu', 'nu', 'xi', 'pi', 'rho', 'sigma',
-        'tau', 'upsilon', 'phi', 'chi', 'psi', 'omega',
-        'Alpha', 'Beta', 'Gamma', 'Delta', 'Theta', 'Lambda', 'Xi', 'Pi',
-        'Sigma', 'Phi', 'Psi', 'Omega'
-    ]
-    
-    # Build regex pattern: match whole words that are Greek letters WITHOUT leading backslash
-    pattern = r'(?<!\\)\b(' + '|'.join(greek_letters) + r')\b'
-    text = re.sub(pattern, r'\\\1', text)
-    
-    # Phase 3: Fix common physics commands
-    commands = ['frac', 'sqrt', 'sin', 'cos', 'tan', 'log', 'ln', 'exp', 'vec']
-    for cmd in commands:
-        text = re.sub(r'(?<!\\)\b(' + cmd + r')\b', r'\\\1', text)
-    
-    # Phase 4: Fix broken superscripts/subscripts with spaces
-    text = re.sub(r'(\^)\s+({)?([0-9a-zA-Z])', r'\1{\3}', text)  # ^ 2 → ^{2}
-    text = re.sub(r'(_)\s+({)?([0-9a-zA-Z])', r'\1{\3}', text)    # _ 0 → _{0}
-    
-    # Phase 5: Ensure math mode is properly delimited (fix stray $)
-    # Remove single $ that aren't paired (common when DeepSeek truncates)
-    dollar_count = text.count('$')
-    if dollar_count % 2 == 1:
-        # Remove the last unpaired $
-        last_idx = text.rfind('$')
-        if last_idx != -1:
-            text = text[:last_idx] + text[last_idx+1:]
-    
-    return text
-    
-
+  
 def normalize_and_compare_numerical(user_answer, expected_answer, rel_tol=0.02, abs_tol=1e-9):
     """
     Compare numerical answers with tolerance after normalizing formats.
@@ -751,15 +691,74 @@ def execute_plotting_code(code_snippet):
     except Exception as e:
         st.error(f"Graph Error: {e}")
 
-def fix_latex(text):
-    """Fix inconsistent LaTeX formatting for Streamlit."""
+#def fix_latex(text):
+ #   """Fix inconsistent LaTeX formatting for Streamlit."""
     # Convert \[ ... \] to $$ ... $$ (display math)
-    text = re.sub(r'\\\[(.*?)\\\]', r'$$\1$$', text, flags=re.DOTALL)
+  #  text = re.sub(r'\\\[(.*?)\\\]', r'$$\1$$', text, flags=re.DOTALL)
     # Convert \( ... \) to $ ... $ (inline math)
     #text = re.sub(r'\\\((.*?)\\\)', r'$\1$', text)
     # Wrap standalone equations that use = and \ but miss $
-    if '=' in text and '\\' in text and not '$' in text:
-        text = re.sub(r'([a-zA-Zα-ωΑ-Ω_]+\s*=\s*\\[^ ]+.*?)(?=\s|$|\.|,)', r'$\1$', text)
+   # if '=' in text and '\\' in text and not '$' in text:
+   #     text = re.sub(r'([a-zA-Zα-ωΑ-Ω_]+\s*=\s*\\[^ ]+.*?)(?=\s|$|\.|,)', r'$\1$', text)
+   # return text
+
+def fix_latex(text):
+    """
+    Fix inconsistent LaTeX formatting for Streamlit rendering.
+    Handles missing backslashes, Unicode characters, and broken math delimiters.
+    """
+    if not isinstance(text, str):
+        return text
+    
+    # Phase 1: Fix Unicode characters → ASCII/LaTeX equivalents
+    unicode_fixes = {
+        '−': '-',      # Unicode minus → ASCII hyphen-minus
+        '–': '-',      # En dash
+        '—': '-',      # Em dash
+        '×': '\\times ',  # Multiplication sign
+        '·': '\\cdot ',   # Middle dot
+        '²': '^2',     # Superscript 2
+        '³': '^3',     # Superscript 3
+        '¹': '^1',
+        '⁰': '^0',
+        '⁻': '^-',     # Superscript minus
+        'Ω': '\\Omega ',
+    }
+    for uni, replacement in unicode_fixes.items():
+        text = text.replace(uni, replacement)
+    
+    # Phase 2: Restore missing backslashes before Greek letters & commands
+    greek_letters = [
+        'alpha', 'beta', 'gamma', 'delta', 'epsilon', 'zeta', 'eta', 'theta',
+        'iota', 'kappa', 'lambda', 'mu', 'nu', 'xi', 'pi', 'rho', 'sigma',
+        'tau', 'upsilon', 'phi', 'chi', 'psi', 'omega',
+        'Alpha', 'Beta', 'Gamma', 'Delta', 'Theta', 'Lambda', 'Xi', 'Pi',
+        'Sigma', 'Phi', 'Psi', 'Omega'
+    ]
+    # Build regex pattern: match whole words that are Greek letters WITHOUT leading backslash
+    pattern = r'(?<!\\)\b(' + '|'.join(greek_letters) + r')\b'
+    text = re.sub(pattern, r'\\\1', text)
+    
+    # Phase 3: Fix common physics commands
+    commands = ['frac', 'sqrt', 'sin', 'cos', 'tan', 'log', 'ln', 'exp', 'vec']
+    for cmd in commands:
+        text = re.sub(r'(?<!\\)\b(' + cmd + r')\b', r'\\\1', text)
+    
+    # Phase 4: Fix broken superscripts/subscripts with spaces
+    text = re.sub(r'(\^)\s+({)?([0-9a-zA-Z])', r'\1{\3}', text)  # ^ 2 → ^{2}
+    text = re.sub(r'(_)\s+({)?([0-9a-zA-Z])', r'\1{\3}', text)    # _ 0 → _{0}
+    
+    # Phase 5: Convert display math delimiters \[...\] → $$...$$
+    text = re.sub(r'\\\[(.*?)\\\]', r'$$\1$$', text, flags=re.DOTALL)
+    
+    # Phase 6: Ensure math mode is properly delimited (fix stray $)
+    dollar_count = text.count('$')
+    if dollar_count % 2 == 1:
+        # Remove the last unpaired $
+        last_idx = text.rfind('$')
+        if last_idx != -1:
+            text = text[:last_idx] + text[last_idx+1:]
+    
     return text
 
 def display_message(role, content, enable_voice=False):
