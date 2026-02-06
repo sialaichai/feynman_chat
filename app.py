@@ -911,7 +911,7 @@ with st.sidebar:
     
     # Hint message
     if is_topic_general:
-        st.info("🔍 Select a specific topic above to generate a targeted quiz.")
+        st.info("🔍 Select a specific topic to generate a targeted quiz.")
     
     if st.button("🧹 Clear Quiz", use_container_width=True):
         if 'quiz_questions' in st.session_state:
@@ -1007,7 +1007,7 @@ else:
 3. Ask your physics question!
 4. Generate Quiz to check your understanding.
 
-Ready to explore physics? Select a topic above! ⚛️"""
+Ready to explore physics? Select a topic! ⚛️"""
         }]
 
     # Display History
@@ -1023,7 +1023,7 @@ Ready to explore physics? Select a topic above! ⚛️"""
     # User Input - DISABLED when no topic selected
 # User Input - DISABLED when no topic selected
 chat_disabled = (topic == "NIL")
-placeholder = "Select a topic above to ask questions..." if chat_disabled else f"Ask about {topic}..."
+placeholder = "Select a topic to ask questions..." if chat_disabled else f"Ask about {topic}..."
 
 if prompt := st.chat_input(placeholder, disabled=chat_disabled):
     
