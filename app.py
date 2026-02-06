@@ -741,8 +741,7 @@ def fix_latex(text):
     for uni, replacement in unicode_fixes.items():
         text = text.replace(uni, replacement)
     
-    # Phase 2: Convert ( \omega ) patterns → $\\omega$ (CRITICAL FIX FOR YOUR ISSUE)
-    # Handles: "( \\omega )", "( omega )", "(\\omega)", etc.
+    # Phase 2: Convert ( \omega ) patterns → $\\omega$
     text = re.sub(
         r'\(\s*\\?([a-zA-Z]+(?:\{[^}]*\})?)\s*\)',
         lambda m: f"${fix_greek_in_match(m.group(1))}$",
@@ -759,13 +758,12 @@ def fix_latex(text):
         'frac', 'sqrt', 'sin', 'cos', 'tan', 'log', 'ln', 'exp', 'vec', 'times',
         'cdot', 'Delta', 'nabla', 'partial', 'infty', 'hbar'
     ]
-    # Build pattern that matches these words WITHOUT leading backslash
     pattern = r'(?<!\\)\b(' + '|'.join(greek_and_commands) + r')\b'
     text = re.sub(pattern, r'\\\1', text)
     
     # Phase 4: Fix broken superscripts/subscripts with spaces
-    text = re.sub(r'(\^)\s+({)?([0-9a-zA-Z])', r'\1{\3}', text)  # ^ 2 → ^{2}
-    text = re.sub(r'(_)\s+({)?([0-9a-zA-Z])', r'\1{\3}', text)    # _ 0 → _{0}
+    text = re.sub(r'(\^)\s+({)?([0-9a-zA-Z])', r'\1{\3}', text)
+    text = re.sub(r'(_)\s+({)?([0-9a-zA-Z])', r'\1{\3}', text)
     
     # Phase 5: Convert display math delimiters \[...\] → $$...$$
     text = re.sub(r'\\\[(.*?)\\\]', r'$$\1$$', text, flags=re.DOTALL)
@@ -774,11 +772,20 @@ def fix_latex(text):
     text = re.sub(r'\$\s+', r'$', text)
     text = re.sub(r'\s+\$', r'$', text)
     
-    # Phase 7: Fix unpaired $ delimiters (common when DeepSeek truncates)
+    # Phase 7: Fix unpaired $ delimiters
     if text.count('$') % 2 == 1:
         last_idx = text.rfind('$')
         if last_idx != -1:
             text = text[:last_idx] + text[last_idx+1:]
+    
+    # Phase 8: ADD SPACING AROUND INLINE MATH (CRITICAL FOR READABILITY)
+    # Add space BEFORE $ when preceded by letter
+    text = re.sub(r'(?<=[a-zA-Z])\$', ' $', text)
+    # Add space AFTER $ when followed by letter
+    text = re.sub(r'\$(?=[a-zA-Z])', '$ ', text)
+    # Special case: lowercase letter adjacency (most common in prose)
+    text = re.sub(r'(?<=[a-z])\$', ' $', text)
+    text = re.sub(r'\$(?=[a-z])', '$ ', text)
     
     return text
 
