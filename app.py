@@ -182,8 +182,26 @@ SEAB_H2_MASTER_INSTRUCTIONS = """
 **CORE DIRECTIVES:**
 1.  **Socratic Method:** Ask ONE simple question at a time but do not ask more than 4 questions for each concept. Do not solve immediately. Be encouraging and enthusiastic.
 2.  **Formatting:**
-    * Use LaTeX for math: $F=ma$ (inline) or $$E=mc^2$$ (block).
+    #* Use LaTeX for math: $F=ma$ (inline) or $$E=mc^2$$ (block).
+    RULES FOR MATHEMATICAL NOTATION (CRITICAL):
+    a. ALWAYS wrap math in $...$ for inline or $$...$$ for display equations
+       ✅ CORRECT: "acceleration $a = -\\omega^2 x$"
+       ❌ WRONG: "acceleration ( \\omega )", "a = -omega^2 x", or "a = −ω²x"
+    b. ALWAYS use backslashes for Greek letters/commands:
+       ✅ \\omega, \\frac{k}{m}, \\Delta x
+       ❌ omega, frac{k}{m}, Δx
+    c. NEVER use Unicode math symbols (ω, ², −) — use LaTeX equivalents
+    d. NEVER use parentheses (...) for math — ONLY $...$ or $$...$$
+    e. Keep equations on ONE LINE inside $...$ (no line breaks)
+    
+    EXAMPLES OF CORRECT OUTPUT:
+    - "The angular frequency is $\\omega$ where $\\omega^2 = \\frac{k}{m}$."
+    - "SHM equation: $a = -\\omega^2 x$"
+    - "Period $T = \\frac{2\\pi}{\\omega}$"
+    
+    VIOLATING THESE RULES BREAKS RENDERING. ALWAYS USE $...$ WITH BACKSLASHES.
     * **Bold** key terms.
+    
 3.  **Tools:**
     * **Graphs:** Write `python` code using `matplotlib` and `numpy`.
     * **Images:** Use `[IMAGE: concise search query]` to show diagrams. Example: "Here is the setup: [IMAGE: youngs double slit diagram]"
@@ -704,45 +722,46 @@ def execute_plotting_code(code_snippet):
 
 def fix_latex(text):
     """
-    Fix inconsistent LaTeX formatting for Streamlit rendering.
-    Handles missing backslashes, Unicode characters, and broken math delimiters.
+    Aggressively repair malformed LaTeX from DeepSeek before Streamlit rendering.
+    Fixes: missing backslashes, ( \\omega ) → $\\omega$, Unicode symbols, spacing issues.
     """
     if not isinstance(text, str):
         return text
     
-    # Phase 1: Fix Unicode characters → ASCII/LaTeX equivalents
+    # Phase 1: Fix Unicode characters → LaTeX equivalents
     unicode_fixes = {
-        '−': '-',      # Unicode minus → ASCII hyphen-minus
-        '–': '-',      # En dash
-        '—': '-',      # Em dash
-        '×': '\\times ',  # Multiplication sign
-        '·': '\\cdot ',   # Middle dot
-        '²': '^2',     # Superscript 2
-        '³': '^3',     # Superscript 3
-        '¹': '^1',
-        '⁰': '^0',
-        '⁻': '^-',     # Superscript minus
-        'Ω': '\\Omega ',
+        'ω': '\\omega ', 'Ω': '\\Omega ', 'α': '\\alpha ', 'β': '\\beta ',
+        'γ': '\\gamma ', 'δ': '\\delta ', 'ε': '\\epsilon ', 'θ': '\\theta ',
+        'λ': '\\lambda ', 'μ': '\\mu ', 'π': '\\pi ', 'σ': '\\sigma ',
+        'τ': '\\tau ', 'φ': '\\phi ', 'ψ': '\\psi ', '²': '^2', '³': '^3',
+        '¹': '^1', '⁰': '^0', '⁻': '^-', '−': '-', '–': '-', '—': '-',
+        '×': '\\times ', '·': '\\cdot ', '÷': '\\div ', '≠': '\\neq ',
+        '≈': '\\approx ', '≤': '\\leq ', '≥': '\\geq ', '√': '\\sqrt{',
     }
     for uni, replacement in unicode_fixes.items():
         text = text.replace(uni, replacement)
     
-    # Phase 2: Restore missing backslashes before Greek letters & commands
-    greek_letters = [
+    # Phase 2: Convert ( \omega ) patterns → $\\omega$ (CRITICAL FIX FOR YOUR ISSUE)
+    # Handles: "( \\omega )", "( omega )", "(\\omega)", etc.
+    text = re.sub(
+        r'\(\s*\\?([a-zA-Z]+(?:\{[^}]*\})?)\s*\)',
+        lambda m: f"${fix_greek_in_match(m.group(1))}$",
+        text
+    )
+    
+    # Phase 3: Restore missing backslashes BEFORE Greek letters/commands
+    greek_and_commands = [
         'alpha', 'beta', 'gamma', 'delta', 'epsilon', 'zeta', 'eta', 'theta',
         'iota', 'kappa', 'lambda', 'mu', 'nu', 'xi', 'pi', 'rho', 'sigma',
         'tau', 'upsilon', 'phi', 'chi', 'psi', 'omega',
         'Alpha', 'Beta', 'Gamma', 'Delta', 'Theta', 'Lambda', 'Xi', 'Pi',
-        'Sigma', 'Phi', 'Psi', 'Omega'
+        'Sigma', 'Phi', 'Psi', 'Omega',
+        'frac', 'sqrt', 'sin', 'cos', 'tan', 'log', 'ln', 'exp', 'vec', 'times',
+        'cdot', 'Delta', 'nabla', 'partial', 'infty', 'hbar'
     ]
-    # Build regex pattern: match whole words that are Greek letters WITHOUT leading backslash
-    pattern = r'(?<!\\)\b(' + '|'.join(greek_letters) + r')\b'
+    # Build pattern that matches these words WITHOUT leading backslash
+    pattern = r'(?<!\\)\b(' + '|'.join(greek_and_commands) + r')\b'
     text = re.sub(pattern, r'\\\1', text)
-    
-    # Phase 3: Fix common physics commands
-    commands = ['frac', 'sqrt', 'sin', 'cos', 'tan', 'log', 'ln', 'exp', 'vec']
-    for cmd in commands:
-        text = re.sub(r'(?<!\\)\b(' + cmd + r')\b', r'\\\1', text)
     
     # Phase 4: Fix broken superscripts/subscripts with spaces
     text = re.sub(r'(\^)\s+({)?([0-9a-zA-Z])', r'\1{\3}', text)  # ^ 2 → ^{2}
@@ -751,15 +770,26 @@ def fix_latex(text):
     # Phase 5: Convert display math delimiters \[...\] → $$...$$
     text = re.sub(r'\\\[(.*?)\\\]', r'$$\1$$', text, flags=re.DOTALL)
     
-    # Phase 6: Ensure math mode is properly delimited (fix stray $)
-    dollar_count = text.count('$')
-    if dollar_count % 2 == 1:
-        # Remove the last unpaired $
+    # Phase 6: Remove spaces immediately inside $...$ delimiters
+    text = re.sub(r'\$\s+', r'$', text)
+    text = re.sub(r'\s+\$', r'$', text)
+    
+    # Phase 7: Fix unpaired $ delimiters (common when DeepSeek truncates)
+    if text.count('$') % 2 == 1:
         last_idx = text.rfind('$')
         if last_idx != -1:
             text = text[:last_idx] + text[last_idx+1:]
     
     return text
+
+def fix_greek_in_match(word):
+    """Helper: Add backslash to Greek letters inside (...) patterns."""
+    greek = ['alpha','beta','gamma','delta','epsilon','theta','lambda','mu',
+             'pi','sigma','tau','phi','psi','omega']
+    if word.lower() in greek or word.lower().startswith('frac') or word.lower().startswith('sqrt'):
+        if not word.startswith('\\'):
+            return '\\' + word
+    return word
 
 def display_message(role, content, enable_voice=False):
     with st.chat_message(role):
@@ -920,17 +950,23 @@ with st.sidebar:
                         {"role": "user", "content": quiz_prompt}
                     ]
                     
-                    quiz_system_instruction = """You are a STRICT JSON generator. FOLLOW EXACTLY:
+                    quiz_system_instruction = """You are a STRICT JSON generator for H2 Physics quizzes. FOLLOW EXACTLY:
                     
                     1. OUTPUT ONLY a VALID JSON ARRAY. NO text before/after. NO markdown.
-                    2. Use DOUBLE quotes ONLY. Escape internal quotes: \\"text\\"
-                    3. NO trailing commas before ] or }
-                    4. MCQ: exactly 4 options. Open-ended: "options": []
-                    5. Use LaTeX like $F=ma$ - NEVER wrap in extra quotes
-                    6. Describe diagrams in text - NO [IMAGE] tags
+                    2. LATEX RULES (CRITICAL FOR RENDERING):
+                       - Inline math: wrap in SINGLE $ like $F=ma$
+                       - ALWAYS DOUBLE BACKSLASHES for Greek letters/commands in JSON strings:
+                         ✅ CORRECT: "\\\\omega", "\\\\frac{k}{m}", "\\\\Delta x"
+                         ❌ WRONG: "\\omega" (single backslash = invalid JSON)
+                       - NEVER use Unicode math symbols (ω, ², −) — use LaTeX equivalents only
+                       - NEVER use parentheses (...) for math — ONLY $...$
+                       - Keep equations on ONE LINE inside $...$ (no line breaks)
+                    3. MCQ: exactly 4 options. Open-ended: "options": []
+                    4. Use ASCII minus sign: - (NOT Unicode −, –, or —)
+                    5. Add max_tokens=4096 to API call to prevent truncation
                     
-                    EXAMPLE:
-                    [{"question_number":1,"question_type":"mcq","question":"Force equals $F=ma$.","options":["$F=ma$","$F=mg$","$v=u+at$","$s=ut+\\frac{1}{2}at^2$"],"correct_answer":"$F=ma$","explanation":"Newton's second law"}]
+                    EXAMPLE OF CORRECT OUTPUT:
+                    [{"question_number":1,"question_type":"mcq","question":"SHM equation: $a=-\\\\omega^2 x$.","options":["$a=-\\\\omega^2 x$","$a=\\\\omega^2 x$","$a=-\\\\omega x$","$a=\\\\omega x$"],"correct_answer":"$a=-\\\\omega^2 x$","explanation":"Acceleration $a$ opposes displacement $x$. Angular frequency $\\\\omega^2 = \\\\frac{k}{m}$."}]
                     
                     OUTPUT ONLY THE JSON ARRAY."""
 
