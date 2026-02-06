@@ -219,7 +219,7 @@ USER_LEVEL_INSTRUCTIONS = {
 QUIZ_LEVELS = {
     "Basic": "Basic: Testing fundamental concepts with recall, comprehension, simple calculations and diagrams",
     "Intermediate": "Intermediate: Analysing and applying concepts to solve problems with moderate complexity",
-    "Advanced": "Advanced: More Complex problems involving 2 or more steps in calculations or linkin gmultiple concepts together."
+    "Advanced": "Advanced: More Complex problems involving 2 or more steps in calculations or linking multiple concepts together, or testing misconcpetions."
 }
 
 # ============================================================
