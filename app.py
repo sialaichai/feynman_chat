@@ -722,8 +722,8 @@ def execute_plotting_code(code_snippet):
 
 def fix_latex(text):
     """
-    Aggressively repair malformed LaTeX from DeepSeek before Streamlit rendering.
-    Fixes: missing backslashes, ( \\omega ) → $\\omega$, Unicode symbols, spacing, trig functions, and delimiter errors.
+    Repair LaTeX formatting issues from DeepSeek output.
+    Handles: missing backslashes, Unicode symbols, delimiter errors, and spacing.
     """
     if not isinstance(text, str):
         return text
@@ -742,64 +742,43 @@ def fix_latex(text):
         text = text.replace(uni, replacement)
     
     # Phase 2: Convert ( \omega ) patterns → $\\omega$
+    import re
     text = re.sub(
         r'\(\s*\\?([a-zA-Z]+(?:\{[^}]*\})?)\s*\)',
         lambda m: f"${fix_greek_in_match(m.group(1))}$",
         text
     )
     
-    # Phase 3: Restore missing backslashes BEFORE Greek letters/commands/trig functions
+    # Phase 3: Restore missing backslashes for Greek/trig commands
     greek_and_commands = [
-        'alpha', 'beta', 'gamma', 'delta', 'epsilon', 'zeta', 'eta', 'theta',
-        'iota', 'kappa', 'lambda', 'mu', 'nu', 'xi', 'pi', 'rho', 'sigma',
-        'tau', 'upsilon', 'phi', 'chi', 'psi', 'omega',
-        'Alpha', 'Beta', 'Gamma', 'Delta', 'Theta', 'Lambda', 'Xi', 'Pi',
-        'Sigma', 'Phi', 'Psi', 'Omega',
-        'frac', 'sqrt', 'sin', 'cos', 'tan', 'log', 'ln', 'exp', 'vec', 'times',
-        'cdot', 'Delta', 'nabla', 'partial', 'infty', 'hbar', 'arcsin', 'arccos', 'arctan'
+        'alpha', 'beta', 'gamma', 'delta', 'epsilon', 'theta', 'lambda', 'mu',
+        'pi', 'sigma', 'tau', 'phi', 'psi', 'omega',
+        'frac', 'sqrt', 'sin', 'cos', 'tan', 'log', 'ln', 'exp', 'vec',
+        'cdot', 'Delta', 'partial', 'infty'
     ]
-    pattern = r'(?<!\\)\b(' + '|'.join(greek_and_commands) + r')\b'
-    text = re.sub(pattern, r'\\\1', text)
+    for cmd in greek_and_commands:
+        # Only add backslash if not already present and not part of a word
+        text = re.sub(r'(?<!\\)\b' + cmd + r'\b', '\\' + cmd, text)
     
-    # Phase 4: Fix broken superscripts/subscripts with spaces
-    text = re.sub(r'(\^)\s+({)?([0-9a-zA-Z])', r'\1{\3}', text)
-    text = re.sub(r'(_)\s+({)?([0-9a-zA-Z])', r'\1{\3}', text)
+    # Phase 4: FIX DELIMITER ARTIFACTS ($$$$ → $$ with newline)
+    # Replace 4+ dollar signs with display math + newline for visual separation
+    text = re.sub(r'\${4,}', '\n$$\n', text)
+    # Replace 3 dollar signs with single $ (rare edge case)
+    text = re.sub(r'\${3}', '$', text)
+    # Collapse double $$ at line boundaries
+    text = re.sub(r'\$\$\s*\$\$', '\n$$\n', text)
     
-    # Phase 5: Convert display math delimiters \[...\] → $$...$$
-    text = re.sub(r'\\\[(.*?)\\\]', r'$$\1$$', text, flags=re.DOTALL)
+    # Phase 5: Add spacing around inline math for readability
+    text = re.sub(r'([a-zA-Z])\$', r'\1 $', text)  # Space before $
+    text = re.sub(r'\$([a-zA-Z])', r'$ \1', text)  # Space after $
     
-    # Phase 6: Collapse multiple adjacent $ delimiters (fixes $$$$ errors)
-    text = re.sub(r'\${2,}', '$$', text)
-    
-    # Phase 7: Remove spaces immediately inside $...$ delimiters
-    text = re.sub(r'\$\s+', r'$', text)
-    text = re.sub(r'\s+\$', r'$', text)
-    
-    # Phase 8: Fix unpaired $ delimiters
-    if text.count('$') % 2 == 1:
-        last_idx = text.rfind('$')
-        if last_idx != -1:
-            text = text[:last_idx] + text[last_idx+1:]
-    
-    # Phase 9: ADD SPACING AROUND INLINE MATH (critical for readability)
-    text = re.sub(r'(?<=[a-zA-Z])\$', ' $', text)  # Space before $ after letter
-    text = re.sub(r'\$(?=[a-zA-Z])', '$ ', text)  # Space after $ before letter
-    text = re.sub(r'(?<=[a-z])\$', ' $', text)    # Lowercase adjacency
-    text = re.sub(r'\$(?=[a-z])', '$ ', text)
-    
-    # Phase 10: Add spacing around binary operators using CAPTURE GROUPS (avoids backslash errors)
-    # \cdot → " \cdot "
-    text = re.sub(r'(\\cdot)', r' \1 ', text)
-    # \times → " \times "
-    text = re.sub(r'(\\times)', r' \1 ', text)
-    # + and - operators (not unary)
-    text = re.sub(r'(?<![a-zA-Z\\])\+(?![a-zA-Z])', ' + ', text)
-    text = re.sub(r'(?<![a-zA-Z\\])-(?![a-zA-Z0-9])', ' - ', text)
-    # = operator
+    # Phase 6: Add spacing around operators (safe replacements without backslashes)
+    text = text.replace('\\cdot', ' \\cdot ')
+    text = text.replace('\\times', ' \\times ')
     text = re.sub(r'\s*=\s*', ' = ', text)
     
     # Cleanup: collapse multiple spaces
-    text = re.sub(r'\s{2,}', ' ', text)
+    text = re.sub(r' +', ' ', text)
     
     return text
 
@@ -811,7 +790,6 @@ def fix_greek_in_match(word):
         if not word.startswith('\\'):
             return '\\' + word
     return word
-
 
 def display_message(role, content, enable_voice=False):
     with st.chat_message(role):
